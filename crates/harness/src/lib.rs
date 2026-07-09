@@ -129,16 +129,20 @@ pub fn parse_u128(s: &str) -> u128 {
         .unwrap_or_else(|e| panic!("parsing u128 {s:?}: {e}"))
 }
 
-/// Parses a decimal integer, saturating at `u128::MAX`. Sensitivity fields
-/// can exceed u128 on extreme cases; saturation makes the magnitude gate
-/// vacuous there while the direction gate stays strict.
-pub fn parse_u128_saturating(s: &str) -> u128 {
-    s.parse().unwrap_or(u128::MAX)
+/// Parses a decimal integer, or `None` if it exceeds `u128`. Sensitivity
+/// fields can exceed u128 on extreme cases (deep-drain trades where the
+/// payout is pinned near the whole reserve); `None` means the magnitude
+/// gate has no meaningful first-order bound there and is skipped, while
+/// the direction gate stays strict.
+pub fn parse_u128_checked(s: &str) -> Option<u128> {
+    s.parse().ok()
 }
+
+// Fixture inputs are exact only for scales at or above the dyadic grid.
+const _: () = assert!(SCALE >= S40_BITS, "SCALE must be >= the fixture grid");
 
 /// Exact `Fixed` from a `value * 2^S40_BITS` fixture field.
 pub fn s40_to_fixed(s40: &str) -> Fixed {
-    assert!(SCALE >= S40_BITS, "SCALE must be >= the fixture grid");
     let raw: i128 = s40
         .parse()
         .unwrap_or_else(|e| panic!("parsing s40 {s40:?}: {e}"));

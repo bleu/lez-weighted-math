@@ -262,16 +262,20 @@ fn kernel_out_given_in_gate() {
         // Magnitude: base is formed with one directed rounding (<= 1 ulp) and
         // the exponent likewise; first-order sensitivities convert those to
         // wei, doubled for curvature headroom. The kernel's own pow error
-        // adds bound_ulps() of balance_out.
-        let sens = parse_u128_saturating(&c.sens_base_wei)
-            .saturating_add(parse_u128_saturating(&c.sens_exp_wei));
-        let bound_wei = (sens >> (SCALE - 1))
-            .saturating_add((balance_out >> SCALE) * bound_ulps())
-            .saturating_add(1);
-        let shortfall = truth - tokens_out;
-        assert!(
-            shortfall <= bound_wei,
-            "payout too small: shortfall {shortfall} wei > bound {bound_wei} in {c:?}"
-        );
+        // adds bound_ulps() of balance_out. Sensitivities beyond u128 mean
+        // no meaningful first-order bound exists for the case (deep-drain
+        // trades); the direction gate above still applies in full.
+        let sens = parse_u128_checked(&c.sens_base_wei)
+            .and_then(|a| parse_u128_checked(&c.sens_exp_wei).and_then(|b| a.checked_add(b)));
+        if let Some(sens) = sens {
+            let bound_wei = (sens >> (SCALE - 1))
+                .saturating_add((balance_out >> SCALE) * bound_ulps())
+                .saturating_add(1);
+            let shortfall = truth - tokens_out;
+            assert!(
+                shortfall <= bound_wei,
+                "payout too small: shortfall {shortfall} wei > bound {bound_wei} in {c:?}"
+            );
+        }
     }
 }

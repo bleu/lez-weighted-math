@@ -10,3 +10,4 @@
 pub mod fixed;
 pub mod pow;
 pub mod weighted;
+pub(crate) mod wide;
