@@ -1,43 +1,31 @@
 //! Weighted-pool swap math (Balancer-style) built on top of [`crate::pow`].
 //!
-//! Wrappers over the core `pow` kernel that express the constant-value-invariant
-//! swap formulae. Signatures only for now; see ADR 0001 for the open questions
-//! about weight representation and rounding conventions.
-
-use crate::fixed::Fixed;
+//! Balances, amounts, and weights cross this API as **raw `u128`** — the LEZ
+//! native token unit (no decimals field). `Fixed` appears only where the math
+//! needs a fractional value in a bounded range: the ratio
+//! `base = balance_in / (balance_in + amount_in)` and the exponent
+//! `weight_in / weight_out`. See ADR 0003.
+//!
+//! Rounding always favours the pool: `calc_out_given_in` returns the floored
+//! payout in wei.
+//!
+//! The scaffold's `calc_in_given_out` and `spot_price` are gone: both need
+//! `pow` with base > 1, which this kernel deliberately does not support
+//! (`base ∈ (0,1)` is what deletes the large-argument `exp` machinery,
+//! see `CONTEXT.md`). They come back only with their own design work.
 
 /// Amount of `token_out` received for a given `amount_in` of `token_in`.
 ///
 /// `out = balance_out * (1 - (balance_in / (balance_in + amount_in))^(weight_in / weight_out))`
-pub fn calc_out_given_in(
-    _balance_in: Fixed,
-    _weight_in: Fixed,
-    _balance_out: Fixed,
-    _weight_out: Fixed,
-    _amount_in: Fixed,
-) -> Fixed {
-    todo!()
-}
-
-/// Amount of `token_in` required to receive a given `amount_out` of `token_out`.
 ///
-/// `in = balance_in * ((balance_out / (balance_out - amount_out))^(weight_out / weight_in) - 1)`
-pub fn calc_in_given_out(
-    _balance_in: Fixed,
-    _weight_in: Fixed,
-    _balance_out: Fixed,
-    _weight_out: Fixed,
-    _amount_out: Fixed,
-) -> Fixed {
-    todo!()
-}
-
-/// Spot price of `token_in` in terms of `token_out` (ignoring swap fees).
-pub fn spot_price(
-    _balance_in: Fixed,
-    _weight_in: Fixed,
-    _balance_out: Fixed,
-    _weight_out: Fixed,
-) -> Fixed {
+/// All quantities are raw `u128` wei / raw weight units. The result is rounded
+/// down (pool-favouring).
+pub fn calc_out_given_in(
+    _balance_in: u128,
+    _weight_in: u128,
+    _balance_out: u128,
+    _weight_out: u128,
+    _amount_in: u128,
+) -> u128 {
     todo!()
 }

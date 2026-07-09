@@ -3,12 +3,14 @@ name = "harness"
 version = "0.0.0"
 edition.workspace = true
 license.workspace = true
-description = "Test/bench harness: mpmath oracle bridge, fixtures, proptest, criterion."
+description = "Test harness: mpmath-oracle fixtures, quantizer, band checker, proptest."
 publish = false
 
 [dependencies]
 weighted-math-core = { path = "../weighted-math-core" }
+# Pinned at versions that build on the workspace toolchain (rustc 1.73).
+serde = { version = "=1.0.203", features = ["derive"] }
+serde_json = "=1.0.117"
 
-# Dev-only tooling gets added here once the oracle bridge / fixtures land:
-#   proptest, criterion, serde, serde_json, ...
 [dev-dependencies]
+proptest = "=1.4.0"

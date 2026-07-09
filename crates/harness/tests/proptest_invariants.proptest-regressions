@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc aba06405759c0f0ebbc38789fa37a9dd4939fcb40946c0641872a36b4f539591 # shrinks to a = Fixed(0)
+cc 807902ae08bd06ffca51bd723d8aede823356ab0fe322e300fcf39a48797a341 # shrinks to (base, expo) = (Fixed(4499096027743126), Fixed(45490905326974))
+cc a04785c0096336f28af3012b0f2b59c63a7a2851790a2c5b95d288299f20d5c2 # shrinks to a = Fixed(0), b = Fixed(0)
+cc ff6a044b4d261021c7539f957a6f329fbbdba2807882737847c50f80335d37ea # shrinks to (base, expo) = (Fixed(4499096027743126), Fixed(45490905326974)), bump = 1
+cc e8ac9f16e20a3c9ba74ab17c7589679de1b75ed4fa7298c87e0b32358efa4cf1 # shrinks to (balance_in, amount_in, balance_out, (w_in, w_out)) = (195651946758565571606024, 362537316572301905, 87678668158548006753513223012123439153, (89, 11)), extra = 793235102220344919
+cc b10f8c3d57cbdb8ff19f742a4518d01efb2206483d801c1b15840aff0410dddc # shrinks to (balance_in, amount_in, balance_out, (w_in, w_out)) = (142890106113986516326143, 239047255924840, 84788455027864449394470452, (10, 90))

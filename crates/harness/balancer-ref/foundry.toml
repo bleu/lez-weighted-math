@@ -1,0 +1,12 @@
+# Offline capture project — never built in CI. See README.md.
+[profile.default]
+src = "src-external"
+script = "script"
+test = "script"
+out = "out"
+cache_path = "cache"
+libs = []
+fs_permissions = [
+    { access = "read", path = "./inputs_flat.json" },
+    { access = "write", path = "./balancer_pow.json" },
+]
