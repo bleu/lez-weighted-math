@@ -1,9 +1,9 @@
 # ADR 0001: Open decisions
 
-Status: **PARTIALLY RESOLVED** — Phase 1 grill settled the harness-facing
-decisions (1, 5, 6) and the balance representation (new, see ADR 0003). The
-scale (2) has a settled *method* but no final value yet; the two kernel-internal
-decisions (3, 4) remain open and belong to the TDD implementation phase.
+Status: **FULLY RESOLVED** — Phase 1 grill settled the harness-facing
+decisions (1, 5, 6) and the balance representation (new, see ADR 0003); the
+kernel TDD phase settled the scale value (2, see ADR 0004), the series
+choice (3, see ADR 0005), and the expm1 boundary (4, see ADR 0006).
 
 These are the decisions carried over from the design brief (`CONTEXT.md`). Each
 is tracked here as the index; the resolved ones point to the ADR that records
@@ -18,30 +18,27 @@ allowance. There are two hard gates (`tokens_out` in wei; `pow` at the ulp
 level) plus a diagnostic on `1 - power`. The band is signed and one-sided:
 `[0, BOUND]`. Full rationale in ADR 0002.
 
-## 2. Fixed-point scale — **METHOD RESOLVED, VALUE PENDING SWEEP**
+## 2. Fixed-point scale — **RESOLVED** (see ADR 0004)
 
-Scale ~2^52 remains the starting point. The grill did not lock a final value —
-that needs a working kernel to sweep — but it did settle *how* the sweep works:
-the oracle emits a quantization floor per candidate scale (`scales.json`), and
-the harness is parametric over `SCALE`, so re-sweeping is a one-line change with
-no fixture regeneration (ADR 0002). The final value gets its own ADR once the
-kernel exists and the sweep runs.
+`SCALE = 52`, confirmed by the post-kernel sweep over {44, 48, 52, 56, 60}:
+the finest public scale the internal 62-bit pipeline can honestly back. The
+sweep mechanism worked as designed in ADR 0002 — a one-line change, no
+fixture regeneration. Sweep table and the two ceilings above 52 in ADR 0004.
 
-**Still open:** the concrete `SCALE` value.
+## 3. Series choice + term count — **RESOLVED** (see ADR 0005)
 
-## 3. Series choice + term count — **OPEN (kernel decision)**
+atanh series for `ln` (13 terms), alternating Taylor for `exp` (20 terms),
+both at internal scale 2^62, Horner with precomputed reciprocal constants.
+One hardware division per `pow`. Taylor over minimax because truncation is
+already far below rounding noise and the constants stay auditable.
 
-Taylor vs minimax on the `[0, 0.693]` range-reduced remainder, and term count.
-Deliberately left to the TDD implementation phase: the harness grades results,
-not the method, so it stays agnostic. Resolve when building the kernel against
-the oracle.
+## 4. `expm1` boundary threshold — **RESOLVED** (see ADR 0006)
 
-## 4. `expm1` boundary threshold — **OPEN (kernel decision)**
-
-Where to switch to `-expm1(y · ln base)` to avoid catastrophic cancellation in
-`1 - power` near the sale start. Also a kernel-internal decision for the TDD
-phase. The harness only needs to *stress* this region, which it does via
-danger-zone fixture weighting (ADR 0002), not by knowing the threshold.
+There is no threshold: `1 - power` is kept at the internal 62-bit scale from
+the exp series into the final widened payout multiply, unconditionally. The
+cancellation risk was a floating-point framing; in fixed point the
+subtraction is exact and only premature rounding to `SCALE` loses payouts —
+so the kernel never does it.
 
 ## 5. Wrapper set + rounding-direction invariants — **RESOLVED** (see ADR 0002)
 

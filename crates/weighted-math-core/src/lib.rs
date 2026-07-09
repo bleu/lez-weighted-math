@@ -1,10 +1,13 @@
 //! `weighted-math-core` — fixed-point weighted-pool math kernel.
 //!
-//! Scaffold only: module stubs with signatures and `todo!()` bodies. No math
-//! is implemented yet, and there are no RISC0 dependencies. See `CONTEXT.md`
-//! and `docs/adr/0001-open-decisions.md` at the workspace root.
+//! A Balancer-style LBP `pow` kernel: `calc_out_given_in` over
+//! `tokensOut = balanceOut · (1 − (balanceIn/(balanceIn+amountIn))^(wIn/wOut))`,
+//! correct to a proven error bound against an mpmath oracle (see
+//! `crates/harness`) and division-frugal for the RISC0 zkVM. Design brief in
+//! `CONTEXT.md`; decisions in `docs/adr/`.
 //!
-//! The crate is `#![no_std]` so it can eventually build for a RISC0 guest.
+//! The crate is `#![no_std]` with no dependencies, so it builds unchanged
+//! for a RISC0 guest.
 #![no_std]
 
 pub mod fixed;

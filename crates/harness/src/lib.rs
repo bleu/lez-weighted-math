@@ -139,6 +139,8 @@ pub fn parse_u128_checked(s: &str) -> Option<u128> {
 }
 
 // Fixture inputs are exact only for scales at or above the dyadic grid.
+// (a compile-time guard for the sweep, not a runtime assertion)
+#[allow(clippy::assertions_on_constants)]
 const _: () = assert!(SCALE >= S40_BITS, "SCALE must be >= the fixture grid");
 
 /// Exact `Fixed` from a `value * 2^S40_BITS` fixture field.

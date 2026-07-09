@@ -230,6 +230,52 @@ fn kernel_arith_wrappers() {
     }
 }
 
+/// Not a gate: reports the worst pow/payout errors at the compiled SCALE,
+/// for the scale sweep and the error-bound writeup. Run explicitly:
+/// `cargo test -p harness --test differential -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn measure_error_margins() {
+    let cases: Vec<PowCase> = load_fixture("pow.json");
+    // (zone, worst raw offset below truth, above truth, worst up/down err)
+    let mut worst_low = 0i128; // raw below t_floor, in ulps
+    let mut worst_high = 0i128; // raw above t_ceil, in ulps
+    let (mut worst_up, mut worst_down) = (0i128, 0i128);
+    for c in &cases {
+        let base = s40_to_fixed(&c.base_s40);
+        let expo = s40_to_fixed(&c.exponent_s40);
+        let (t_floor, t_ceil) = q_to_scale_bounds(&c.pow_exact_q128, 128);
+        let raw = pow::pow(base, expo).0;
+        worst_low = worst_low.max(t_floor - raw);
+        worst_high = worst_high.max(raw - t_ceil);
+        worst_up = worst_up.max(pow::pow_up(base, expo).0 - t_ceil);
+        worst_down = worst_down.max(t_floor - pow::pow_down(base, expo).0);
+    }
+    println!(
+        "SCALE={SCALE} raw_below={worst_low} raw_above={worst_high} \
+         up_err={worst_up} down_err={worst_down} bound={}",
+        bound_ulps()
+    );
+
+    let swaps: Vec<OutGivenInCase> = load_fixture("out_given_in.json");
+    let mut worst_rel_num = 0u128; // shortfall as multiple of balance_out ulps
+    for c in &swaps {
+        let tokens_out = weighted::calc_out_given_in(
+            parse_u128(&c.balance_in),
+            parse_u128(&c.weight_in),
+            parse_u128(&c.balance_out),
+            parse_u128(&c.weight_out),
+            parse_u128(&c.amount_in),
+        );
+        let truth = parse_u128(&c.tokens_out_floor);
+        assert!(tokens_out <= truth);
+        let shortfall = truth - tokens_out;
+        let ulp_of_reserve = (parse_u128(&c.balance_out) >> SCALE).max(1);
+        worst_rel_num = worst_rel_num.max(shortfall / ulp_of_reserve);
+    }
+    println!("payout worst shortfall = {worst_rel_num} reserve-ulps (balance_out * 2^-SCALE)");
+}
+
 /// The economic gate: the floored payout in wei. Direction is absolute
 /// (never overpay — that is the fund-loss surface); magnitude is bounded by
 /// first-order input-formation sensitivity plus the kernel allowance, all

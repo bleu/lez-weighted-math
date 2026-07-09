@@ -47,6 +47,8 @@ const ONE_62: i128 = 1 << LN_SCALE;
 
 // The pipeline needs guard bits over the public scale, and the fixed shift
 // arithmetic below assumes at least two of them.
+// (a compile-time guard for the sweep, not a runtime assertion)
+#[allow(clippy::assertions_on_constants)]
 const _: () = assert!(SCALE <= 60, "SCALE needs >= 2 guard bits under LN_SCALE");
 
 /// round(ln(2) · 2^62)
