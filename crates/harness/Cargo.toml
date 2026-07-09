@@ -1,0 +1,14 @@
+[package]
+name = "harness"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+description = "Test/bench harness: mpmath oracle bridge, fixtures, proptest, criterion."
+publish = false
+
+[dependencies]
+weighted-math-core = { path = "../weighted-math-core" }
+
+# Dev-only tooling gets added here once the oracle bridge / fixtures land:
+#   proptest, criterion, serde, serde_json, ...
+[dev-dependencies]

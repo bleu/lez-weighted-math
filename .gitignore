@@ -1,0 +1,17 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock is kept for the workspace (binaries/reproducible builds).
+# Remove the next line if this ever becomes a library-only publish.
+# /Cargo.lock
+
+# Criterion benchmark output
+/target/criterion/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

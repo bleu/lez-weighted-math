@@ -1,0 +1,18 @@
+# Workspace: lez-weighted-math
+# Fixed-point weighted-pool `pow` math kernel targeting the LEZ RISC0 zkVM.
+[workspace]
+resolver = "2"
+members = [
+    "crates/weighted-math-core",
+    "crates/harness",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = ""
+
+# Keep release math deterministic and reproducible. No overflow wraparound in
+# release either — this is financial math, we want panics over silent wrap.
+[profile.release]
+overflow-checks = true
