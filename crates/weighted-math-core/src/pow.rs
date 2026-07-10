@@ -198,18 +198,13 @@ pub fn expm1(x: Fixed) -> Fixed {
     Fixed(-to_scale_nearest(omp62))
 }
 
-/// Pool-favouring padding for [`one_minus_pow_62`], in ulps at `LN_SCALE`:
+/// Pool-favouring padding at `LN_SCALE` for the 62-bit swap-path results:
 /// `2^-53`, twice the module error analysis's pipeline bound.
-const OMP_PAD_62: i128 = 512;
+const PAD_62: i128 = 512;
 
-/// `1 - base^exponent` held at `LN_SCALE` and rounded DOWN (pool-favouring),
-/// for the payout path. Never materializing `1 - power` at `SCALE` is what
-/// preserves sale-start accuracy: near `power ~ 1` the true value can be as
-/// small as `2^-46`, far below a `2^-SCALE` ulp's relative resolution, but
-/// the guard bits carry it into the final widened payout multiply intact.
-/// The subtraction itself is exact — fixed point has absolute precision —
-/// so the only error is the pipeline's, dominated by [`OMP_PAD_62`].
-pub(crate) fn one_minus_pow_62(base: Fixed, exponent: Fixed) -> i128 {
+/// `exp(exponent · ln base)` at `LN_SCALE`, unpadded — the shared core of
+/// the 62-bit swap paths.
+fn pow_62(base: Fixed, exponent: Fixed) -> i128 {
     assert!(base.0 > 0 && base.0 < ONE.0, "domain: base in (0, 1)");
     assert!(
         exponent.0 > 0 && exponent.0 <= 99 * ONE.0,
@@ -217,7 +212,25 @@ pub(crate) fn one_minus_pow_62(base: Fixed, exponent: Fixed) -> i128 {
     );
     let neg_ln = ln_inner(base.0);
     let neg_arg = wide::mul_shr(exponent.0 as u128, neg_ln as u128, SCALE) as i128;
-    (ONE_62 - exp_inner(neg_arg) - OMP_PAD_62).max(0)
+    exp_inner(neg_arg)
+}
+
+/// `1 - base^exponent` held at `LN_SCALE` and rounded DOWN (pool-favouring),
+/// for the payout path. Never materializing `1 - power` at `SCALE` is what
+/// preserves sale-start accuracy: near `power ~ 1` the true value can be as
+/// small as `2^-46`, far below a `2^-SCALE` ulp's relative resolution, but
+/// the guard bits carry it into the final widened payout multiply intact.
+/// The subtraction itself is exact — fixed point has absolute precision —
+/// so the only error is the pipeline's, dominated by [`PAD_62`].
+pub(crate) fn one_minus_pow_62(base: Fixed, exponent: Fixed) -> i128 {
+    (ONE_62 - pow_62(base, exponent) - PAD_62).max(0)
+}
+
+/// `base^exponent` held at `LN_SCALE` and rounded DOWN (pool-favouring),
+/// for the exact-out payment path: an understated power overstates the
+/// required payment `balance_in · (1 - p)/p`.
+pub(crate) fn pow_62_down(base: Fixed, exponent: Fixed) -> i128 {
+    (pow_62(base, exponent) - PAD_62).max(0)
 }
 
 /// The shared pow pipeline: `exp(exponent · ln base)` nearest-rounded to

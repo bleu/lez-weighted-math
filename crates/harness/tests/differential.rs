@@ -230,6 +230,112 @@ fn kernel_arith_wrappers() {
     }
 }
 
+/// The reverse economic gate: the ceiled payment in wei. Direction is
+/// absolute (never undercharge — that is the fund-loss surface for exact-out
+/// trades); magnitude mirrors the out gate, with an extra first-order term
+/// for the kernel's own power error (`sens_pow · bound_ulps · 2^-SCALE`).
+#[test]
+fn kernel_in_given_out_gate() {
+    let cases: Vec<InGivenOutCase> = load_fixture("in_given_out.json");
+    assert_eq!(
+        cases[0].zone, "sale_start",
+        "danger zone must lead the file"
+    );
+    for c in &cases {
+        let amount_in = weighted::calc_in_given_out(
+            parse_u128(&c.balance_in),
+            parse_u128(&c.weight_in),
+            parse_u128(&c.balance_out),
+            parse_u128(&c.weight_out),
+            parse_u128(&c.amount_out),
+        );
+        let truth = parse_u128(&c.amount_in_ceil);
+        let balance_in = parse_u128(&c.balance_in);
+
+        // Direction: the pool must never charge less than the true price.
+        assert!(
+            amount_in >= truth,
+            "UNDERCHARGE (fund leak): kernel {amount_in} < truth {truth} in {c:?}"
+        );
+
+        // Magnitude: input-formation sensitivities (doubled for curvature)
+        // plus the kernel's power-error and grid terms. Sensitivities beyond
+        // u128 mean the case is direction-only (deep-drain corner).
+        let sens = parse_u128_checked(&c.sens_base_wei)
+            .and_then(|a| parse_u128_checked(&c.sens_exp_wei).and_then(|b| a.checked_add(b)));
+        let sens_pow = parse_u128_checked(&c.sens_pow_wei);
+        if let (Some(sens), Some(sens_pow)) = (sens, sens_pow) {
+            let bound_wei = (sens >> (SCALE - 1))
+                .saturating_add(wide_shr_or_max(sens_pow, bound_ulps()))
+                .saturating_add((balance_in >> SCALE) * bound_ulps())
+                .saturating_add(1);
+            let overcharge = amount_in - truth;
+            assert!(
+                overcharge <= bound_wei,
+                "overcharge {overcharge} wei > bound {bound_wei} in {c:?}"
+            );
+        }
+    }
+}
+
+/// `sens_pow * ulps / 2^SCALE`, saturating (sens_pow can be near u128::MAX).
+fn wide_shr_or_max(sens_pow: u128, ulps: u128) -> u128 {
+    let (hi, lo) = mul_wide(sens_pow, ulps);
+    if hi >> SCALE != 0 {
+        u128::MAX
+    } else {
+        (hi << (128 - SCALE)) | (lo >> SCALE)
+    }
+}
+
+/// Spot price: exact rational band check, no oracle value needed. The
+/// implementation composes two up-rounded steps (reserve ratio, weight
+/// ratio), so it is >= the true rational (direction, checked exactly at
+/// double width) and within a small computable band above it.
+#[test]
+fn kernel_spot_price_check() {
+    let cases: Vec<OutGivenInCase> = load_fixture("out_given_in.json");
+    let mut checked = 0;
+    for c in &cases {
+        let (b_in, w_in) = (parse_u128(&c.balance_in), parse_u128(&c.weight_in));
+        let (b_out, w_out) = (parse_u128(&c.balance_out), parse_u128(&c.weight_out));
+        // The exact check multiplies cross terms at double width; skip the
+        // few cases whose cross products already exceed u128.
+        let (Some(num), Some(den)) = (b_in.checked_mul(w_out), b_out.checked_mul(w_in)) else {
+            continue;
+        };
+        let spot = weighted::spot_price(b_in, w_in, b_out, w_out);
+        assert!(spot.0 > 0, "spot must be positive in {c:?}");
+        let spot_repr = spot.0 as u128;
+        if spot_repr >= 1 << 74 {
+            continue; // outside the band-check envelope
+        }
+
+        // Direction: spot * den >= num * 2^SCALE, exactly.
+        let lhs = mul_wide(spot_repr, den);
+        let rhs = shl_wide(num, SCALE);
+        assert!(
+            wide_le(rhs, lhs),
+            "spot understates the true price (wrong side) in {c:?}"
+        );
+
+        // Magnitude: spot <= true + band, checked as
+        // (spot - band) * den <= num * 2^SCALE. The band mirrors the
+        // implementation's two up-roundings: 2 ulps through the weight
+        // ratio, 2 through the reserve ratio, plus slack.
+        let wr = (w_out << SCALE).div_ceil(w_in);
+        let r_est = ((spot_repr << SCALE) / wr) + 1;
+        let band = 2 * (wr >> SCALE) + (r_est >> SCALE) + 4;
+        let lhs = mul_wide(spot_repr.saturating_sub(band), den);
+        assert!(
+            wide_le(lhs, rhs),
+            "spot too far above the true price: band {band} in {c:?}"
+        );
+        checked += 1;
+    }
+    assert!(checked > 20, "too few spot cases checked: {checked}");
+}
+
 /// Not a gate: reports the worst pow/payout errors at the compiled SCALE,
 /// for the scale sweep and the error-bound writeup. Run explicitly:
 /// `cargo test -p harness --test differential -- --ignored --nocapture`

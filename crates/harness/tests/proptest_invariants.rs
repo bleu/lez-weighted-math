@@ -65,6 +65,29 @@ fn any_swap() -> impl Strategy<Value = (u128, u128, u128, (u128, u128))> {
     prop_oneof![2 => sale_start_swap(), 3 => swap()]
 }
 
+/// An exact-out trade. `amount_out` respects the kernel's 30% out-ratio cap
+/// and additionally `exponent · drain_fraction <= 1/4`, which keeps the
+/// required payment below ~b_in/2 so it always fits u128 (the kernel's
+/// "payment must be representable" envelope).
+fn exact_out_swap() -> impl Strategy<Value = (u128, u128, u128, (u128, u128))> {
+    (balance(), balance(), weights()).prop_flat_map(|(balance_in, balance_out, (w_in, w_out))| {
+        let cap30 = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
+        // ~b_out·w_in/(4·w_out), saturating: when the weight ratio makes it
+        // exceed the reserve, the 30% cap governs anyway.
+        let cap_fit = (balance_out / (4 * w_out))
+            .checked_mul(w_in)
+            .unwrap_or(u128::MAX);
+        let max_out = cap30.min(cap_fit).max(1);
+        (
+            Just(balance_in),
+            Just(balance_out),
+            Just((w_in, w_out)),
+            1..=max_out,
+        )
+            .prop_map(|(bi, bo, w, a)| (bi, a, bo, w))
+    })
+}
+
 /// pow domain: base in (0,1), exponent in (0, 99], with the sale-start
 /// corner (base ~ 1, exponent ~ 0.0101) oversampled.
 fn pow_input() -> impl Strategy<Value = (Fixed, Fixed)> {
@@ -108,6 +131,18 @@ proptest! {
     fn generator_pow_inputs_in_domain((base, expo) in pow_input()) {
         prop_assert!(base.0 > 0 && base.0 < ONE.0);
         prop_assert!(expo.0 > 0 && expo.0 <= MAX_EXPONENT);
+    }
+
+    /// Exact-out trades respect the 30% cap and the representability bound.
+    #[test]
+    fn generator_exact_out_in_domain((_bi, amount_out, balance_out, (w_in, w_out)) in exact_out_swap()) {
+        prop_assert!(amount_out >= 1);
+        // the kernel's own floor(30%) cap formula, overflow-free
+        let cap30 = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
+        prop_assert!(amount_out <= cap30.max(1));
+        // exponent * drain <= ~1/4 keeps the payment below ~b_in/2
+        let cap_fit = (balance_out / (4 * w_out)).checked_mul(w_in).unwrap_or(u128::MAX);
+        prop_assert!(amount_out <= cap_fit || amount_out == 1);
     }
 }
 
@@ -190,5 +225,33 @@ proptest! {
         let out1 = weighted::calc_out_given_in(balance_in, w_in, balance_out, w_out, amount_in);
         let out2 = weighted::calc_out_given_in(balance_in, w_in, balance_out, w_out, amount_in + extra);
         prop_assert!(out2 >= out1);
+    }
+
+    /// Buying tokens always costs something, never panics in-envelope, and
+    /// asking for more never costs less.
+    #[test]
+    fn calc_in_positive_and_monotone(
+        (balance_in, amount_out, balance_out, (w_in, w_out)) in exact_out_swap(),
+    ) {
+        let cost = weighted::calc_in_given_out(balance_in, w_in, balance_out, w_out, amount_out);
+        prop_assert!(cost >= 1, "exact-out trades are never free");
+        if amount_out > 1 {
+            let less = weighted::calc_in_given_out(balance_in, w_in, balance_out, w_out, amount_out - 1);
+            prop_assert!(less <= cost);
+        }
+    }
+
+    /// Spot price is positive and weakly increasing in balance_in.
+    #[test]
+    fn spot_price_positive_and_monotone(
+        (balance_in, _a, balance_out, (w_in, w_out)) in swap(),
+        bump in 1u128..=10u128.pow(18),
+    ) {
+        let spot = weighted::spot_price(balance_in, w_in, balance_out, w_out);
+        prop_assert!(spot.0 > 0);
+        if let Some(more) = balance_in.checked_add(bump) {
+            let spot2 = weighted::spot_price(more, w_in, balance_out, w_out);
+            prop_assert!(spot2.0 >= spot.0);
+        }
     }
 }

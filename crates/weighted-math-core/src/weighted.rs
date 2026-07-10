@@ -16,10 +16,10 @@
 //! - the final payout multiply floors.
 //! So the kernel payout never exceeds the true one.
 //!
-//! The scaffold's `calc_in_given_out` and `spot_price` are gone: both need
-//! `pow` with base > 1, which this kernel deliberately does not support
-//! (`base ∈ (0,1)` is what deletes the large-argument `exp` machinery,
-//! see `CONTEXT.md`). They come back only with their own design work.
+//! `calc_in_given_out` naively needs `pow` with base > 1, which this kernel
+//! does not support (`base ∈ (0,1)` is what deletes the large-argument `exp`
+//! machinery). Instead it is algebraically inverted into the native domain —
+//! see its docs and ADR 0007. `spot_price` needs no `pow` at all.
 //!
 //! # Enforced envelope (asserted, so violations panic instead of wrapping)
 //!
@@ -64,15 +64,7 @@ pub fn calc_out_given_in(
     let total = balance_in
         .checked_add(amount_in)
         .expect("total deposit must stay below 2^128");
-    assert!(weight_in >= 1 && weight_out >= 1, "zero weight");
-    assert!(
-        weight_in <= 1 << 64 && weight_out <= 1 << 64,
-        "weight envelope: <= 2^64"
-    );
-    assert!(
-        weight_in <= 99 * weight_out && weight_out <= 99 * weight_in,
-        "weight ratio envelope: within [1/99, 99]"
-    );
+    check_weights(weight_in, weight_out);
 
     // Exponent rounds down, base rounds up: both overstate the power.
     let exponent = Fixed(((weight_in << SCALE) / weight_out) as i128);
@@ -88,24 +80,117 @@ pub fn calc_out_given_in(
     wide::mul_shr(balance_out, omp62 as u128, pow::LN_SCALE)
 }
 
-/// `num / den` as a `Fixed`, rounded UP, for `num <= den` of full `u128`
-/// range — one hardware division.
+/// Amount of `token_in` required to receive a given `amount_out` of
+/// `token_out`.
 ///
-/// When `den` is too wide for the `num << SCALE` numerator to fit, both
-/// operands are pre-shifted down, biased so the ratio can only grow
-/// (numerator rounds up, denominator truncates): the result still never
-/// understates the true ratio. The bias costs at most `~2^-73` relative —
-/// far below one ulp at any swept SCALE. Capped at `ONE`.
+/// `in = balance_in * ((balance_out / (balance_out - amount_out))^(weight_out / weight_in) - 1)`
+///
+/// Rounded up (the pool never undercharges). Internally the base-above-one
+/// form is inverted into the kernel's native domain:
+/// `(b/(b-a))^y - 1 = (1-p)/p` with `p = ((b-a)/b)^y ∈ (0,1)`, so every
+/// rounding direction flips once: base' DOWN, exponent UP, power padded
+/// DOWN — all of which overstate the payment.
+///
+/// Envelope (ADR 0007): `amount_out <= 30%` of the reserve (Balancer
+/// parity; also keeps `p` far above the kernel's pad floor), and the
+/// resulting payment must fit `u128` (the widened multiply asserts).
+pub fn calc_in_given_out(
+    balance_in: u128,
+    weight_in: u128,
+    balance_out: u128,
+    weight_out: u128,
+    amount_out: u128,
+) -> u128 {
+    assert!(balance_in >= 1 && balance_out >= 1, "empty reserve");
+    check_weights(weight_in, weight_out);
+    // floor(0.3 · balance_out) without overflowing 3·balance_out
+    let cap = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
+    assert!(
+        amount_out <= cap,
+        "amount_out envelope: <= 30% of the reserve"
+    );
+    if amount_out == 0 {
+        return 0;
+    }
+
+    // Exponent rounds up, base' rounds down: both understate p.
+    let exponent = Fixed((((weight_out << SCALE) + weight_in - 1) / weight_in) as i128);
+    let base = ratio_down(balance_out - amount_out, balance_out);
+    let p62 = pow::pow_62_down(base, exponent);
+    // With the 30% cap, p >= 0.7^99 ~ 2^-50.6, four times the pad floor.
+    assert!(p62 > 0, "power underflows the internal scale");
+
+    // (1 - p)/p at LN_SCALE, rounded up: numerator <= 2^124 fits u128.
+    let num = ((ONE_62 - p62) as u128) << pow::LN_SCALE;
+    let r62 = (num + p62 as u128 - 1) / p62 as u128;
+
+    // amount_in = ceil(balance_in · r62 / 2^62): the widened multiply. Its
+    // fit assertion is the "payment must be representable" envelope.
+    wide::mul_shr_up(balance_in, r62, pow::LN_SCALE)
+}
+
+/// Spot price of `token_in` in terms of `token_out` (ignoring swap fees):
+/// `(balance_in / weight_in) / (balance_out / weight_out)`, rounded up.
+///
+/// Informational (no funds move on it): composed from two up-rounded
+/// ratios, so it never understates the true price and sits within a few
+/// ulps above it (checked exactly by the harness at double width). Panics
+/// if the price exceeds the `Fixed` range.
+pub fn spot_price(balance_in: u128, weight_in: u128, balance_out: u128, weight_out: u128) -> Fixed {
+    assert!(balance_in >= 1 && balance_out >= 1, "empty reserve");
+    check_weights(weight_in, weight_out);
+    let wratio = Fixed((((weight_out << SCALE) + weight_in - 1) / weight_in) as i128);
+    ratio_up(balance_in, balance_out).mul_up(wratio)
+}
+
+const ONE_62: i128 = 1 << pow::LN_SCALE;
+
+fn check_weights(weight_in: u128, weight_out: u128) {
+    assert!(weight_in >= 1 && weight_out >= 1, "zero weight");
+    assert!(
+        weight_in <= 1 << 64 && weight_out <= 1 << 64,
+        "weight envelope: <= 2^64"
+    );
+    assert!(
+        weight_in <= 99 * weight_out && weight_out <= 99 * weight_in,
+        "weight ratio envelope: within [1/99, 99]"
+    );
+}
+
+/// `num / den` as a `Fixed`, rounded UP, for operands of full `u128` range —
+/// one hardware division. `num` may exceed `den` (spot-price ratios).
+///
+/// When the operands are too wide for the `num << SCALE` numerator to fit,
+/// both are pre-shifted down, biased so the ratio can only grow (numerator
+/// rounds up, denominator truncates): the result never understates the true
+/// ratio. The bias costs at most `~2^-73` relative — far below one ulp at
+/// any swept SCALE — except for ratios beyond `2^(126-SCALE)`, which cannot
+/// be represented anyway (downstream fit checks panic).
 fn ratio_up(num: u128, den: u128) -> Fixed {
-    debug_assert!(num <= den && den > 0);
-    let den_bits = 128 - den.leading_zeros();
-    let excess = den_bits.saturating_sub(126 - SCALE);
+    debug_assert!(den > 0);
+    let bits = 128 - num.max(den).leading_zeros();
+    let excess = bits.saturating_sub(126 - SCALE);
     let (n, d) = if excess > 0 {
-        ((num >> excess) + 1, den >> excess)
+        ((num >> excess) + 1, (den >> excess).max(1))
     } else {
         (num, den)
     };
     // n <= 2^(126-SCALE) + 1, so n << SCALE < 2^127 and `+ d - 1` fits.
     let q = ((n << SCALE) + d - 1) / d;
-    Fixed((q as i128).min(ONE.0))
+    Fixed(q as i128)
+}
+
+/// `num / den` as a `Fixed`, rounded DOWN, for `num < den` — the mirror of
+/// [`ratio_up`]: the pre-shift bias truncates the numerator and rounds the
+/// denominator up, so the result never overstates the true ratio.
+fn ratio_down(num: u128, den: u128) -> Fixed {
+    debug_assert!(num < den);
+    let den_bits = 128 - den.leading_zeros();
+    let excess = den_bits.saturating_sub(126 - SCALE);
+    let (n, d) = if excess > 0 {
+        (num >> excess, (den >> excess) + 1)
+    } else {
+        (num, den)
+    };
+    Fixed(((n << SCALE) / d) as i128)
 }

@@ -85,6 +85,24 @@ pub struct OutGivenInCase {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct InGivenOutCase {
+    pub zone: String,
+    pub balance_in: String,
+    pub amount_out: String,
+    pub balance_out: String,
+    pub weight_in: String,
+    pub weight_out: String,
+    pub base: String,
+    pub exponent: String,
+    pub power_exact: String,
+    pub power_exact_q128: String,
+    pub amount_in_ceil: String,
+    pub sens_base_wei: String,
+    pub sens_exp_wei: String,
+    pub sens_pow_wei: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ArithCase {
     pub a: String,
     pub a_s40: String,

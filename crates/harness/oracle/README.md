@@ -28,8 +28,15 @@ python3 gen.py
   payout sensitivities (wei per unit of input error) so the harness derives
   a SCALE-parametric magnitude bound; `one_minus_power_exact` is computed
   via `expm1`, never by subtraction.
+- `in_given_out.json` — the reverse economic gate: exact-out trades with
+  the true ceiled payment `amount_in_ceil` (the pool never undercharges)
+  and three sensitivities (`sens_base_wei`, `sens_exp_wei`, `sens_pow_wei`)
+  for the parametric magnitude bound. Note the danger zone flips here:
+  sale-start exact-out trades sit at exponent 99, not 0.0101 (ADR 0007).
 - `arith.json` — input pairs for the mul/div/complement wrappers. No truth
   stored: the harness recomputes the exact rational at double width.
+  `spot_price` is likewise checked against the exact rational at double
+  width (over the `out_given_in.json` inputs), so it needs no fixture.
 - `scales.json` — the quantization floor per candidate `SCALE` for the
   sweep (ADR 0001 decision 2).
 - `balancer_inputs.json` — the pow cases rounded onto Balancer's 1e18 grid,

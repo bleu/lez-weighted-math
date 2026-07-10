@@ -284,6 +284,91 @@ def out_given_in_cases():
 
 
 # ---------------------------------------------------------------------------
+# in_given_out.json — the reverse economic gate. The kernel computes it via
+# the inverted base p = ((b_out - a)/b_out)^(w_out/w_in), which lives in
+# (0,1), and amount_in = b_in · (1-p)/p rounded UP (the user can never pay
+# less than the true price). amount_out is capped at 30% of the reserve
+# (Balancer parity), which also keeps p far above the kernel's pad floor.
+# ---------------------------------------------------------------------------
+
+def in_case(balance_in, weight_in, balance_out, weight_out, amount_out, zone):
+    assert amount_out <= balance_out * 3 // 10, "30% out-ratio cap"
+    assert Fraction(1, 99) <= Fraction(weight_in, weight_out) <= 99
+
+    base = Fraction(balance_out - amount_out, balance_out)
+    y = Fraction(weight_out, weight_in)
+    mbase, my = to_mpf(base), to_mpf(y)
+
+    if y.denominator == 1:
+        p = base ** y.numerator  # exact rational
+        num = balance_in * (p.denominator - p.numerator)
+        amount_in = -(-num // p.numerator)  # ceil
+        power_dec, power_q128 = nstr(to_mpf(p)), frac_qfmt(p)
+    else:
+        p = mp.power(mbase, my)
+        amount_in = int(mp.ceil(balance_in * (1 / p - 1)))
+        power_dec, power_q128 = nstr(p), qfmt(p)
+
+    mpower = to_mpf(p) if isinstance(p, Fraction) else p
+    # First-order payment sensitivities (wei per unit of input error):
+    #   |d in / d base| = b_in · y / (p · base)
+    #   |d in / d y|    = b_in · |ln base| / p
+    #   |d in / d p|    = b_in / p²   (the kernel's own power error)
+    sens_base = int(mp.ceil(balance_in * my / (mpower * mbase)))
+    sens_exp = int(mp.ceil(balance_in * abs(mp.log(mbase)) / mpower))
+    sens_pow = int(mp.ceil(balance_in / (mpower * mpower)))
+
+    return {
+        "zone": zone,
+        "balance_in": str(balance_in),
+        "amount_out": str(amount_out),
+        "balance_out": str(balance_out),
+        "weight_in": str(weight_in),
+        "weight_out": str(weight_out),
+        "base": nstr(mbase),
+        "exponent": nstr(my),
+        "power_exact": power_dec,
+        "power_exact_q128": power_q128,
+        "amount_in_ceil": str(amount_in),
+        "sens_base_wei": str(sens_base),
+        "sens_exp_wei": str(sens_exp),
+        "sens_pow_wei": str(sens_pow),
+    }
+
+
+def in_given_out_cases():
+    U127 = (1 << 127) - 1
+    specs = [
+        # Sale start: buying exact project tokens is the HIGH-exponent side
+        # here (exponent = w_out/w_in = 99).
+        (10**18, 1, 10**27, 99, 1, "sale_start"),
+        (10**18, 1, 10**27, 99, 10**18, "sale_start"),
+        (10**18, 1, 10**27, 99, 10**21, "sale_start"),
+        (10**18, 1, 10**27, 99, 10**24, "sale_start"),
+        (10**18, 1, 10**27, 99, 3 * 10**26, "sale_start"),  # 30% corner
+        (25 * 10**18, 5, 4 * 10**26, 95, 10**23, "sale_start"),
+        # Overflow edge: huge balances, payment near the top of u128.
+        (15 * 10**37, 50, 3 * 10**38, 50, 9 * 10**37, "overflow_edge"),
+        (U127, 95, U127, 5, 1 << 125, "overflow_edge"),
+        (15 * 10**37, 5, 3 * 10**38, 95, 10**37, "overflow_edge"),
+        # Dust.
+        (10**27, 1, 10**27, 99, 1, "dust"),
+        (10**18, 50, 10**18, 50, 1, "dust"),
+        # General mid-sale shapes.
+        (10**21, 50, 10**24, 50, 10**19, "general"),
+        (10**21, 60, 10**24, 40, 10**20, "general"),
+        (10**21, 40, 10**24, 60, 29 * 10**22, "general"),
+        (777 * 10**18, 70, 25 * 10**22, 30, 3 * 10**21, "general"),
+        (10**24, 30, 8 * 10**22, 70, 10**22, "general"),
+        # Sale end: the low-exponent side (1/99).
+        (10**27, 99, 10**20, 1, 10**19, "sale_end"),
+        (10**27, 99, 10**20, 1, 3 * 10**19, "sale_end"),
+        (10**24, 90, 10**21, 10, 10**20, "sale_end"),
+    ]
+    return [in_case(*s) for s in specs]
+
+
+# ---------------------------------------------------------------------------
 # arith.json — input pairs for the mul/div/complement wrappers. No truth
 # needed: the harness recomputes the exact rational at double width.
 # ---------------------------------------------------------------------------
@@ -381,6 +466,7 @@ def main():
     dump("pow.json", pcases)
     dump("ln_exp.json", ln_exp_cases())
     dump("out_given_in.json", out_given_in_cases())
+    dump("in_given_out.json", in_given_out_cases())
     dump("arith.json", arith_cases())
     dump("scales.json", scale_cases())
     bcases = balancer_inputs(pcases)
