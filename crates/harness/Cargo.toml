@@ -11,6 +11,8 @@ weighted-math-core = { path = "../weighted-math-core" }
 # Pinned at versions that build on the workspace toolchain (rustc 1.73).
 serde = { version = "=1.0.203", features = ["derive"] }
 serde_json = "=1.0.117"
+# Exact big-integer referee for the curve-invariant property (ADR 0008).
+num-bigint = "=0.4.6"
 
 [dev-dependencies]
 proptest = "=1.4.0"

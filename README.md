@@ -15,6 +15,8 @@ implemented yet.
   `weighted` module stubs). No RISC0 dependencies yet.
 - `crates/harness` — dev/test crate for the mpmath oracle bridge, fixtures,
   `proptest` properties, and `criterion` benchmarks.
+- `fuzz` — separate workspace: the coverage-guided curve-invariant fuzz
+  target (local-only, see ADR 0008).
 - `CONTEXT.md` — design brief.
 - `docs/adr/` — architecture decision records.
 
@@ -24,6 +26,24 @@ implemented yet.
 cargo build --workspace
 cargo test --workspace
 ```
+
+### Fuzzing
+
+The curve invariant (`b_in^w_in * b_out^w_out` never decreases across a
+trade) is checked two ways: proptest properties in
+`crates/harness/tests/proptest_invariants.rs`, which run with the normal
+test suite, and a coverage-guided libFuzzer target that explores the whole
+enforced envelope against an exact big-integer referee. The fuzz target is
+not wired into CI; run it locally when the kernel changes:
+
+```sh
+rustup toolchain install nightly   # once
+cargo install cargo-fuzz           # once
+cargo +nightly fuzz run trade_invariant
+```
+
+It runs until interrupted or until it finds a counterexample (saved under
+`fuzz/artifacts/`).
 
 ## License
 

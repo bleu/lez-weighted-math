@@ -1,0 +1,36 @@
+# Separate workspace: the coverage-guided fuzz target. Kept out of the root
+# workspace because cargo-fuzz needs a nightly toolchain, while the kernel +
+# harness stay on the pinned rustc 1.73. Local-only by decision (ADR 0008) —
+# no CI job runs this.
+#
+# Run (needs `rustup toolchain install nightly` and `cargo install cargo-fuzz`):
+#   cargo +nightly fuzz run trade_invariant
+[package]
+name = "weighted-math-fuzz"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+# Cargo.lock pins jobserver at 0.1.31 so `cargo check` still works on the
+# workspace's stable 1.73; the fuzzer itself runs on nightly regardless.
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+weighted-math-core = { path = "../crates/weighted-math-core" }
+harness = { path = "../crates/harness" }
+
+[[bin]]
+name = "trade_invariant"
+path = "fuzz_targets/trade_invariant.rs"
+test = false
+doc = false
+
+[profile.release]
+# Match the root workspace: financial math panics on overflow, never wraps.
+overflow-checks = true
+
+[workspace]

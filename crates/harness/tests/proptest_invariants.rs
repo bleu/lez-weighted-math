@@ -7,7 +7,7 @@
 
 use proptest::prelude::*;
 
-use harness::{Fixed, ONE, SCALE};
+use harness::{invariant_preserved, Fixed, ONE, SCALE};
 use weighted_math_core::{pow, weighted};
 
 const MAX_EXPONENT: i128 = 99 * (1i128 << SCALE);
@@ -239,6 +239,37 @@ proptest! {
             let less = weighted::calc_in_given_out(balance_in, w_in, balance_out, w_out, amount_out - 1);
             prop_assert!(less <= cost);
         }
+    }
+
+    /// The curve value `b_in^w_in * b_out^w_out` never decreases across an
+    /// exact-in trade (ADR 0008). This is the end-to-end fund-safety
+    /// statement all the per-step rounding directions exist to guarantee;
+    /// the referee is exact bigint arithmetic, independent of the kernel.
+    /// Equality is allowed — zero-fee math holds the curve constant, so an
+    /// exactly-representable trade can land on it.
+    #[test]
+    fn invariant_never_decreases_exact_in(
+        (balance_in, amount_in, balance_out, (w_in, w_out)) in any_swap(),
+    ) {
+        let out = weighted::calc_out_given_in(balance_in, w_in, balance_out, w_out, amount_in);
+        prop_assert!(
+            invariant_preserved(balance_in, w_in, balance_out, w_out, amount_in, out),
+            "curve decreased: pool paid too much for the trade"
+        );
+    }
+
+    /// Same statement for exact-out: the payment charged always covers the
+    /// tokens withdrawn. This guards the ADR 0007 inversion, where every
+    /// rounding direction flips once — the likeliest place for a leak.
+    #[test]
+    fn invariant_never_decreases_exact_out(
+        (balance_in, amount_out, balance_out, (w_in, w_out)) in exact_out_swap(),
+    ) {
+        let cost = weighted::calc_in_given_out(balance_in, w_in, balance_out, w_out, amount_out);
+        prop_assert!(
+            invariant_preserved(balance_in, w_in, balance_out, w_out, cost, amount_out),
+            "curve decreased: pool undercharged for the trade"
+        );
     }
 
     /// Spot price is positive and weakly increasing in balance_in.

@@ -263,6 +263,43 @@ pub fn check_two_sided(t_floor: i128, t_ceil: i128, actual: i128, bound_ulps: u1
 }
 
 // ---------------------------------------------------------------------------
+// Curve-invariant referee (ADR 0008)
+// ---------------------------------------------------------------------------
+
+/// Does the trade keep the curve value `b_in^w_in * b_out^w_out` from
+/// decreasing? Checked with exact big-integer arithmetic: both sides are
+/// products of u128 values raised to small integer weights (~12.7k bits at
+/// weight 99), so the comparison has no rounding of its own. A `false` is a
+/// real fund leak, never a referee artifact — and the referee shares no code
+/// with the kernel, so a kernel bug cannot vouch for itself.
+///
+/// Weights are the raw integer units the generators use, capped at 99 so
+/// they can be exponents here. Kernel behaviour only depends on the weight
+/// ratio, and every ratio p/q with p, q <= 99 is reachable at this cap.
+pub fn invariant_preserved(
+    balance_in: u128,
+    weight_in: u128,
+    balance_out: u128,
+    weight_out: u128,
+    amount_in: u128,
+    amount_out: u128,
+) -> bool {
+    use num_bigint::BigUint;
+    assert!(
+        (1..=99).contains(&weight_in) && (1..=99).contains(&weight_out),
+        "referee weights must be small integer exponents"
+    );
+    if amount_out > balance_out {
+        return false;
+    }
+    let (w_in, w_out) = (weight_in as u32, weight_out as u32);
+    let before = BigUint::from(balance_in).pow(w_in) * BigUint::from(balance_out).pow(w_out);
+    let after = (BigUint::from(balance_in) + amount_in).pow(w_in)
+        * BigUint::from(balance_out - amount_out).pow(w_out);
+    after >= before
+}
+
+// ---------------------------------------------------------------------------
 // Double-width helpers for the exact arithmetic-wrapper checks
 // ---------------------------------------------------------------------------
 
@@ -321,6 +358,22 @@ mod tests {
             check_directional(100, 101, 100, Direction::Up, 2),
             Band::WrongSide { by_ulps: 1 }
         );
+    }
+
+    #[test]
+    fn invariant_referee_verdicts() {
+        // 50/50 pool, constant product 100*100 = 10000.
+        // Pay 10 in, take 9 out: 110*91 = 10010 >= 10000.
+        assert!(invariant_preserved(100, 50, 100, 50, 10, 9));
+        // Take 10 out for 10 in: 110*90 = 9900 < 10000 — a leak.
+        assert!(!invariant_preserved(100, 50, 100, 50, 10, 10));
+        // Equality is allowed: nothing moves, nothing leaks.
+        assert!(invariant_preserved(100, 50, 100, 50, 0, 0));
+        // Draining past the reserve is a leak by definition.
+        assert!(!invariant_preserved(100, 50, 100, 50, u128::MAX, 101));
+        // Asymmetric weights, huge balances: 2^127-scale operands must not
+        // overflow the referee (they can't — it's bigint end to end).
+        assert!(invariant_preserved(1 << 127, 1, 1 << 127, 99, 1 << 90, 0));
     }
 
     #[test]
