@@ -64,6 +64,26 @@ const _: () = assert!(
 /// All quantities are raw `u128` wei / raw weight units. The result is
 /// rounded down (pool-favouring); a trade too small to move the quantized
 /// ratio pays zero.
+///
+/// ```
+/// use weighted_math_core::weighted::calc_out_given_in;
+///
+/// // Sell 1000 wei of token A into a 99/1 pool.
+/// let out = calc_out_given_in(
+///     1_000_000_000, // balance_in  (raw u128 wei)
+///     99,            // weight_in
+///     500_000_000,   // balance_out
+///     1,             // weight_out
+///     1_000,         // amount_in
+/// );
+/// assert!(out > 0 && out < 500_000_000);
+/// ```
+///
+/// # Panics
+///
+/// On envelope violations (never wraps): an empty reserve, a total deposit
+/// `balance_in + amount_in` past `u128`, a zero weight, a weight above
+/// `2^64`, or a weight ratio outside `[1/99, 99]`.
 pub fn calc_out_given_in(
     balance_in: u128,
     weight_in: u128,
@@ -103,9 +123,28 @@ pub fn calc_out_given_in(
 /// rounding direction flips once: base' DOWN, exponent UP, power padded
 /// DOWN — all of which overstate the payment.
 ///
-/// Envelope (ADR 0007): `amount_out <= 30%` of the reserve (Balancer
-/// parity; also keeps `p` far above the kernel's pad floor), and the
-/// resulting payment must fit `u128` (the widened multiply asserts).
+/// ```
+/// use weighted_math_core::weighted::calc_in_given_out;
+///
+/// // Price an exact-out purchase of 1000 wei of token B.
+/// let amount_in = calc_in_given_out(
+///     1_000_000_000, // balance_in
+///     99,            // weight_in
+///     500_000_000,   // balance_out
+///     1,             // weight_out
+///     1_000,         // amount_out
+/// );
+/// assert!(amount_in > 0);
+/// ```
+///
+/// # Panics
+///
+/// On the [`calc_out_given_in`] envelope violations, plus two of its own
+/// (ADR 0007): `amount_out` above 30% of the reserve (Balancer's
+/// `MAX_OUT_RATIO` parity; also keeps the power far above the kernel's pad
+/// floor), and a payment past `u128` (the widened multiply's fit assertion
+/// — a start-of-sale purchase of 30% of the tokens can genuinely price
+/// beyond `2^128` wei, and the pool refuses rather than wraps).
 pub fn calc_in_given_out(
     balance_in: u128,
     weight_in: u128,
@@ -148,8 +187,12 @@ pub fn calc_in_given_out(
 ///
 /// Informational (no funds move on it): composed from two up-rounded
 /// ratios, so it never understates the true price and sits within a few
-/// ulps above it (checked exactly by the harness at double width). Panics
-/// if the price exceeds the `Fixed` range.
+/// ulps above it (checked exactly by the harness at double width).
+///
+/// # Panics
+///
+/// On the shared weight/reserve envelope violations, and if the price
+/// exceeds the `Fixed` range.
 pub fn spot_price(balance_in: u128, weight_in: u128, balance_out: u128, weight_out: u128) -> Fixed {
     assert!(balance_in >= 1 && balance_out >= 1, "empty reserve");
     check_weights(weight_in, weight_out);

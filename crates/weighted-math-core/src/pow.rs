@@ -175,6 +175,10 @@ fn to_scale_nearest(v62: i128) -> i128 {
 }
 
 /// Natural logarithm of `x ∈ (0, 1]`; result `<= 0`, nearest-rounded.
+///
+/// # Panics
+///
+/// If `x` is outside `(0, 1]`.
 pub fn ln(x: Fixed) -> Fixed {
     assert!(x.0 > 0 && x.0 <= ONE.0, "ln domain: (0, 1]");
     Fixed(-to_scale_nearest(ln_inner(x.0)))
@@ -189,6 +193,10 @@ const EXP_SATURATION: i128 = 64 << SCALE;
 
 /// Natural exponential of `x <= 0`; result in `[0, 1]`, nearest-rounded
 /// (zero means the true value underflows the `2^-SCALE` grid).
+///
+/// # Panics
+///
+/// If `x > 0`.
 pub fn exp(x: Fixed) -> Fixed {
     assert!(x.0 <= 0, "exp domain: x <= 0");
     if x.0 <= -EXP_SATURATION {
@@ -202,6 +210,10 @@ pub fn exp(x: Fixed) -> Fixed {
 /// At `LN_SCALE` this is the *exact* complement `1 - exp_inner(-x)`: fixed
 /// point has absolute precision, so no cancellation occurs — the guard bits
 /// carry the small result until the single final rounding.
+///
+/// # Panics
+///
+/// If `x > 0`.
 pub fn expm1(x: Fixed) -> Fixed {
     assert!(x.0 <= 0, "expm1 domain: x <= 0");
     if x.0 <= -EXP_SATURATION {
@@ -265,6 +277,11 @@ fn pow_raw(base: Fixed, exponent: Fixed) -> i128 {
 /// `base^exponent`, both fixed-point. Rounding direction unspecified (error
 /// within [`POW_PAD_ULPS`] either side); use `pow_down` / `pow_up` when the
 /// direction matters.
+///
+/// # Panics
+///
+/// If `base` is outside `(0, 1]` or `exponent` outside `(0, 99]` (also the
+/// panic condition of `pow_down` and `pow_up`).
 pub fn pow(base: Fixed, exponent: Fixed) -> Fixed {
     Fixed(pow_raw(base, exponent))
 }

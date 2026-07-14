@@ -19,7 +19,7 @@ use crate::wide;
 ///
 /// Sweepable: change this const to trade precision against cycle cost. The
 /// harness re-grades at the new scale with no fixture regeneration
-/// (ADR 0001 decision 2, ADR 0002).
+/// (mechanism in ADR 0002; the choice of 52 in ADR 0004).
 pub const SCALE: u32 = 52;
 
 /// Backing integer representation for a fixed-point value.

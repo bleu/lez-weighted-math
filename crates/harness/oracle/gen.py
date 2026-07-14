@@ -40,7 +40,7 @@ DIGITS = 78     # human-facing decimal digits for truth values
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 
-# Candidate fixed-point scales for the sweep (ADR 0001 decision 2).
+# Candidate fixed-point scales for the sweep (ADR 0002; result in ADR 0004).
 SCALES = [40, 44, 48, 52, 56, 60]
 
 
