@@ -1,0 +1,52 @@
+# Opt-in zkVM job: builds the RISC0 guest and runs the host-vs-guest bit
+# parity check over the fixture set. Kept out of ci.yml so the fast default
+# CI never installs the risc0 toolchain (and stays Python-free) — this only
+# runs when the kernel, the fixtures, or the zkvm workspace change, or on
+# manual dispatch.
+name: zkVM guest
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/weighted-math-core/**"
+      - "crates/harness/fixtures/**"
+      - "zkvm/**"
+      - ".github/workflows/zkvm.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/weighted-math-core/**"
+      - "crates/harness/fixtures/**"
+      - "zkvm/**"
+      - ".github/workflows/zkvm.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  parity:
+    name: guest build + bit parity + cycles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install RISC0 toolchain (pinned 3.0.5)
+        run: |
+          curl -sSfL https://risczero.com/install | bash
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+          "$HOME/.risc0/bin/rzup" install rust 1.94.1
+          "$HOME/.risc0/bin/rzup" install cargo-risczero 3.0.5
+          "$HOME/.risc0/bin/rzup" install r0vm 3.0.5
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zkvm
+
+      - name: Guest parity + cycle report
+        working-directory: zkvm
+        run: cargo run --release
