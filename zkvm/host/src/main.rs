@@ -19,7 +19,7 @@ use zkvm_methods::WEIGHTED_MATH_GUEST_ELF;
 /// Fixture inputs are dyadic multiples of 2^-40 (harness::S40_BITS).
 const S40_BITS: u32 = 40;
 
-const OP_NAMES: [&str; 11] = [
+const OP_NAMES: [&str; 10] = [
     "ln",
     "exp",
     "expm1",
@@ -28,7 +28,6 @@ const OP_NAMES: [&str; 11] = [
     "pow_down",
     "calc_out_given_in",
     "calc_in_given_out",
-    "spot_price",
     "u128_div",
     "baseline",
 ];
@@ -110,9 +109,8 @@ fn host_eval(op: u32, c: &[u128]) -> u128 {
         5 => pow::pow_down(Fixed(c[0] as i128), Fixed(c[1] as i128)).0 as u128,
         6 => weighted::calc_out_given_in(c[0], c[1], c[2], c[3], c[4]),
         7 => weighted::calc_in_given_out(c[0], c[1], c[2], c[3], c[4]),
-        8 => weighted::spot_price(c[0], c[1], c[2], c[3]).0 as u128,
-        9 => c[0] / c[1],
-        10 => c[0],
+        8 => c[0] / c[1],
+        9 => c[0],
         _ => unreachable!(),
     }
 }
@@ -233,18 +231,6 @@ fn main() -> Result<()> {
             ]
         })
         .collect();
-    let spot_inputs: Vec<Vec<u128>> = out_cases
-        .iter()
-        .map(|c| {
-            vec![
-                wei(&c.balance_in),
-                wei(&c.weight_in),
-                wei(&c.balance_out),
-                wei(&c.weight_out),
-            ]
-        })
-        .collect();
-
     // Division microbench: operand magnitudes matching the kernel's actual
     // divisions — ln's t-division (~2^123 / ~2^63), the exponent formation
     // (~2^116 / ~2^64), ratio_up (~2^126 / ~2^74), and smaller shapes for
@@ -265,11 +251,10 @@ fn main() -> Result<()> {
     ops.push((3, pow_inputs.clone()));
     ops.push((4, pow_inputs.clone()));
     ops.push((5, pow_inputs.clone()));
-    ops.push((6, out_inputs.clone()));
+    ops.push((6, out_inputs));
     ops.push((7, in_inputs));
-    ops.push((8, spot_inputs));
-    ops.push((9, div_inputs));
-    ops.push((10, baseline_inputs));
+    ops.push((8, div_inputs));
+    ops.push((9, baseline_inputs));
 
     // ---- Parity + per-call cycles over every batch --------------------
     let mut mismatches = 0usize;
@@ -296,10 +281,10 @@ fn main() -> Result<()> {
             }
         }
         let st = stats(&batch.cycles);
-        if *op == 10 {
+        if *op == 9 {
             baseline_median = st.median;
         }
-        if *op == 9 {
+        if *op == 8 {
             div_bench = inputs
                 .iter()
                 .zip(&batch.cycles)
@@ -324,7 +309,7 @@ fn main() -> Result<()> {
             st.min,
             st.median,
             st.max,
-            if *op == 10 { st.median } else { net },
+            if *op == 9 { st.median } else { net },
         );
     }
 

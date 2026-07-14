@@ -9,8 +9,8 @@
 //!          followed by the guest cycle delta for the call (u64, 2 words)
 //!
 //! Ops: 0 ln, 1 exp, 2 expm1, 3 pow, 4 pow_up, 5 pow_down,
-//!      6 calc_out_given_in, 7 calc_in_given_out, 8 spot_price,
-//!      9 u128 division (hotspot microbench), 10 baseline (empty measured
+//!      6 calc_out_given_in, 7 calc_in_given_out,
+//!      8 u128 division (hotspot microbench), 9 baseline (empty measured
 //!      region: the cost of the two `cycle_count` reads themselves).
 //!
 //! Cycle deltas are measured with `env::cycle_count()` around the call, with
@@ -26,9 +26,8 @@ use weighted_math_core::{pow, weighted};
 
 fn words_for(op: u32) -> usize {
     match op {
-        0..=2 | 10 => 4,
-        3..=5 | 9 => 8,
-        8 => 16,
+        0..=2 | 9 => 4,
+        3..=5 | 8 => 8,
         6 | 7 => 20,
         _ => panic!("unknown op {op}"),
     }
@@ -64,9 +63,8 @@ fn main() {
             5 => pow::pow_down(Fixed(a(0) as i128), Fixed(a(1) as i128)).0 as u128,
             6 => weighted::calc_out_given_in(a(0), a(1), a(2), a(3), a(4)),
             7 => weighted::calc_in_given_out(a(0), a(1), a(2), a(3), a(4)),
-            8 => weighted::spot_price(a(0), a(1), a(2), a(3)).0 as u128,
-            9 => a(0) / a(1),
-            10 => a(0),
+            8 => a(0) / a(1),
+            9 => a(0),
             _ => unreachable!(),
         };
         let cycles = env::cycle_count() - start;

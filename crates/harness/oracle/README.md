@@ -35,8 +35,6 @@ python3 gen.py
   sale-start exact-out trades sit at exponent 99, not 0.0101 (ADR 0006).
 - `arith.json` — input pairs for the mul/div/complement wrappers. No truth
   stored: the harness recomputes the exact rational at double width.
-  `spot_price` is likewise checked against the exact rational at double
-  width (over the `out_given_in.json` inputs), so it needs no fixture.
 - `scales.json` — the quantization floor per candidate `SCALE` for the
   scale sweep (mechanism in ADR 0001; result in ADR 0003).
 - `balancer_inputs.json` — the pow cases rounded onto Balancer's 1e18 grid,

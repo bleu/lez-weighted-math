@@ -264,18 +264,4 @@ proptest! {
             "curve decreased: pool undercharged for the trade"
         );
     }
-
-    /// Spot price is positive and weakly increasing in balance_in.
-    #[test]
-    fn spot_price_positive_and_monotone(
-        (balance_in, _a, balance_out, (w_in, w_out)) in swap(),
-        bump in 1u128..=10u128.pow(18),
-    ) {
-        let spot = weighted::spot_price(balance_in, w_in, balance_out, w_out);
-        prop_assert!(spot.0 > 0);
-        if let Some(more) = balance_in.checked_add(bump) {
-            let spot2 = weighted::spot_price(more, w_in, balance_out, w_out);
-            prop_assert!(spot2.0 >= spot.0);
-        }
-    }
 }

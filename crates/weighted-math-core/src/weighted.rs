@@ -7,7 +7,7 @@
 //! Every rounding favours the pool: base up, exponent down, `1 - power`
 //! padded down, final payout multiply floored — the payout never exceeds
 //! the true value. `calc_in_given_out` is inverted into the same
-//! `base ∈ (0,1)` domain (ADR 0006); `spot_price` needs no `pow` at all.
+//! `base ∈ (0,1)` domain (ADR 0006).
 //!
 //! Envelope (asserted; violations panic, never wrap): reserves >= 1 wei,
 //! total deposit < 2^128, weights in `[1, 2^64]` with ratio in
@@ -141,22 +141,6 @@ pub fn calc_in_given_out(
     wide::mul_shr_up(balance_in, r62, pow::LN_SCALE)
 }
 
-/// Spot price of `token_in` in terms of `token_out` (ignoring swap fees):
-/// `(balance_in / weight_in) / (balance_out / weight_out)`, rounded up.
-///
-/// Informational (no funds move on it). Never understates the true price
-/// and sits within a few ulps above it (checked exactly by the harness).
-///
-/// # Panics
-///
-/// On the shared envelope violations, or a price past the `Fixed` range.
-pub fn spot_price(balance_in: u128, weight_in: u128, balance_out: u128, weight_out: u128) -> Fixed {
-    assert!(balance_in >= 1 && balance_out >= 1, "empty reserve");
-    check_weights(weight_in, weight_out);
-    let wratio = Fixed((((weight_out << SCALE) + weight_in - 1) / weight_in) as i128);
-    ratio_up(balance_in, balance_out).mul_up(wratio)
-}
-
 const ONE_62: i128 = 1 << pow::LN_SCALE;
 
 fn check_weights(weight_in: u128, weight_out: u128) {
@@ -171,22 +155,16 @@ fn check_weights(weight_in: u128, weight_out: u128) {
     );
 }
 
-/// `num / den` as a `Fixed`, rounded up — one division. `num` may exceed
-/// `den` (spot-price ratios).
+/// `num / den` as a `Fixed`, rounded up, for `num <= den` — one division.
 ///
 /// Wide operands are pre-shifted down, biased so the result can only
-/// round up (cost `< 2^-73` relative). A denominator that shifts to zero
-/// means the ratio is past the `Fixed` range: the helper panics rather
-/// than understate it. The fund paths pass `num <= den` and never hit
-/// this.
+/// round up (cost `< 2^-73` relative).
 fn ratio_up(num: u128, den: u128) -> Fixed {
-    debug_assert!(den > 0);
-    let bits = 128 - num.max(den).leading_zeros();
-    let excess = bits.saturating_sub(126 - SCALE);
+    debug_assert!(num <= den && den > 0);
+    let den_bits = 128 - den.leading_zeros();
+    let excess = den_bits.saturating_sub(126 - SCALE);
     let (n, d) = if excess > 0 {
-        let d = den >> excess;
-        assert!(d > 0, "ratio exceeds the representable Fixed range");
-        ((num >> excess) + 1, d)
+        ((num >> excess) + 1, den >> excess)
     } else {
         (num, den)
     };

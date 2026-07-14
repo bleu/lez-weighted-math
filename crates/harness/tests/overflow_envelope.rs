@@ -61,23 +61,6 @@ fn unrepresentable_payment_panics() {
     weighted::calc_in_given_out(b, 1, b, 99, b / 10 * 3);
 }
 
-/// Spot price past `Fixed`: the balance ratio is representable but the
-/// 99/1 weight tips the final `mul_up` over u128.
-#[test]
-#[should_panic(expected = "widened product exceeds u128")]
-fn unrepresentable_spot_price_panics() {
-    weighted::spot_price(1u128 << 120, 1, 1u128 << 50, 99);
-}
-
-/// Spot price past `Fixed` through the balance ratio alone: equal weights
-/// keep `mul_up` in range, so the ratio itself must halt instead of
-/// silently understating.
-#[test]
-#[should_panic(expected = "ratio exceeds the representable Fixed range")]
-fn unrepresentable_spot_price_panics_in_ratio() {
-    weighted::spot_price(1u128 << 120, 1, 1, 1);
-}
-
 // ---------------------------------------------------------------------------
 // Property hammers at the envelope edge
 // ---------------------------------------------------------------------------

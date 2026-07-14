@@ -280,53 +280,6 @@ fn wide_shr_or_max(sens_pow: u128, ulps: u128) -> u128 {
     }
 }
 
-/// Spot price against the exact rational at double width: never below the
-/// truth, and within a small computable band above it. No oracle fixture
-/// needed.
-#[test]
-fn kernel_spot_price_check() {
-    let cases: Vec<OutGivenInCase> = load_fixture("out_given_in.json");
-    let mut checked = 0;
-    for c in &cases {
-        let (b_in, w_in) = (parse_u128(&c.balance_in), parse_u128(&c.weight_in));
-        let (b_out, w_out) = (parse_u128(&c.balance_out), parse_u128(&c.weight_out));
-        // The exact check multiplies cross terms at double width; skip the
-        // few cases whose cross products already exceed u128.
-        let (Some(num), Some(den)) = (b_in.checked_mul(w_out), b_out.checked_mul(w_in)) else {
-            continue;
-        };
-        let spot = weighted::spot_price(b_in, w_in, b_out, w_out);
-        assert!(spot.0 > 0, "spot must be positive in {c:?}");
-        let spot_repr = spot.0 as u128;
-        if spot_repr >= 1 << 74 {
-            continue; // outside the band-check envelope
-        }
-
-        // Direction: spot * den >= num * 2^SCALE, exactly.
-        let lhs = mul_wide(spot_repr, den);
-        let rhs = shl_wide(num, SCALE);
-        assert!(
-            wide_le(rhs, lhs),
-            "spot understates the true price (wrong side) in {c:?}"
-        );
-
-        // Magnitude: spot <= true + band, checked as
-        // (spot - band) * den <= num * 2^SCALE. The band mirrors the
-        // implementation's two up-roundings: 2 ulps through the weight
-        // ratio, 2 through the reserve ratio, plus slack.
-        let wr = (w_out << SCALE).div_ceil(w_in);
-        let r_est = ((spot_repr << SCALE) / wr) + 1;
-        let band = 2 * (wr >> SCALE) + (r_est >> SCALE) + 4;
-        let lhs = mul_wide(spot_repr.saturating_sub(band), den);
-        assert!(
-            wide_le(lhs, rhs),
-            "spot too far above the true price: band {band} in {c:?}"
-        );
-        checked += 1;
-    }
-    assert!(checked > 20, "too few spot cases checked: {checked}");
-}
-
 /// Not a gate: reports the worst pow/payout errors at the compiled SCALE,
 /// for the scale sweep and the error-bound writeup. Run explicitly:
 /// `cargo test -p harness --test differential -- --ignored --nocapture`

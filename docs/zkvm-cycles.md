@@ -1,6 +1,6 @@
 # zkVM cycle cost of the weighted-math kernel
 
-Measured 2026-07-10 with the RISC0 3.0.5 executor (no proving), guest rust
+Measured 2026-07-14 with the RISC0 3.0.5 executor (no proving), guest rust
 toolchain 1.94.1, `SCALE = 52`, guest built in release with
 `overflow-checks = true` — the same semantics the on-chain program would
 ship. Reproduce with `cd zkvm && cargo run --release` (see `zkvm/README.md`).
@@ -9,9 +9,9 @@ This table feeds RFP-016 P3.
 ## Host-vs-guest parity
 
 `weighted-math-core` compiles unchanged for the RV32IM guest. Across the
-whole fixture set — 373 evaluations: 87 pow cases through each of `pow`,
+whole fixture set — 344 evaluations: 87 pow cases through each of `pow`,
 `pow_up`, `pow_down`, 11 ln, 12 exp, 12 expm1, 29 `calc_out_given_in`,
-19 `calc_in_given_out`, 29 `spot_price` — every guest output is bit-identical
+19 `calc_in_given_out` — every guest output is bit-identical
 to the host's. The host harness (mpmath oracle gates in `crates/harness`)
 remains the source of truth for correctness; the guest is verified against
 it, and the executor run exits nonzero on any mismatch.
@@ -34,24 +34,23 @@ zero-payout guard), not noise.
 | `ln`                |    11 |      4,608 |  2,722 |  5,023 | 1 |
 | `exp`               |    12 |      4,139 |     57 |  4,140 | 0 |
 | `expm1`             |    12 |      4,169 |     56 |  4,170 | 0 |
-| `calc_out_given_in` (full buy) | 29 | 11,463 | 656 | 11,949 | 3 |
-| `calc_in_given_out` |    19 |     14,197 | 10,976 | 14,915 | 4 |
-| `spot_price`        |    29 |      2,187 |  1,141 |  3,028 | 2 |
+| `calc_out_given_in` (full buy) | 29 | 11,522 | 721 | 11,950 | 3 |
+| `calc_in_given_out` |    19 |     14,195 | 10,974 | 14,913 | 4 |
 
 Whole-program cost, running the batch-median case as a one-shot guest
-session (startup and I/O included; measured session overhead is ~4,090
+session (startup and I/O included; measured session overhead is ~4,080
 cycles on top of the call itself):
 
 | program            | user cycles | padded segment cycles | segments |
 |--------------------|------------:|----------------------:|---------:|
-| one `pow`          |      12,194 | 65,536 (2^16 minimum) | 1 |
-| one full buy       |      15,648 | 65,536 (2^16 minimum) | 1 |
-| one exact-out sell |      18,382 | 65,536 (2^16 minimum) | 1 |
+| one `pow`          |      12,191 | 65,536 (2^16 minimum) | 1 |
+| one full buy       |      15,702 | 65,536 (2^16 minimum) | 1 |
+| one exact-out sell |      18,375 | 65,536 (2^16 minimum) | 1 |
 
 A single swap doesn't come close to filling even the minimum segment (a full
 buy occupies 24% of 2^16). Against RISC0's default 2^20 segment, one buy is
 about 1.1% of a segment, and a batched program fits roughly 90 buys per
-segment ((1,048,576 − 4,087) / 11,561).
+segment ((1,048,576 − 4,082) / 11,620).
 
 ## Division count and the hotspot
 
@@ -81,7 +80,6 @@ Static division counts, from the code (all confirmed by the measured deltas):
   inside `pow`. Together roughly half the 11.5k-cycle buy.
 - `calc_in_given_out`: 4 — exponent, `ratio_down`, the pow division, and
   the `(1-p)/p` inversion.
-- `spot_price`: 2, no `pow` at all.
 
 The largest *block* is different from the largest instruction: the 20-term
 exp Horner loop costs ~4.1k cycles (about half of `pow`), at roughly 210

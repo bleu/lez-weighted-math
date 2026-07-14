@@ -17,8 +17,8 @@ Two kinds of guarantee appear below and it matters which is which:
   can never overflow in-domain. Some of these carry a `debug_assert!` as a
   cross-check, which compiles away in release.
 - guarded: the bound is a representability limit of the *inputs* (a payment
-  that genuinely exceeds `u128`, a spot price beyond `Fixed`). These are
-  hard `assert!`s, active in release: the kernel halts instead of wrapping.
+  that genuinely exceeds `u128`). These are hard `assert!`s, active in
+  release: the kernel halts instead of wrapping.
 
 This workspace also sets `overflow-checks = true` for the release profile.
 The proof does not lean on that (a guest image may build without it), and
@@ -30,7 +30,7 @@ All of these are hard `assert!`s (or `checked_add`), active in release.
 
 | bound | enforced in |
 |---|---|
-| `balance_in >= 1`, `balance_out >= 1` | `weighted.rs` (both swap paths, `spot_price`) |
+| `balance_in >= 1`, `balance_out >= 1` | `weighted.rs` (both swap paths) |
 | `balance_in + amount_in < 2^128` | `calc_out_given_in` (`checked_add`) |
 | `1 <= weight <= 2^64`, ratio within `[1/99, 99]` | `check_weights` |
 | `amount_out <= floor(30% of balance_out)` | `calc_in_given_out` |
@@ -96,18 +96,14 @@ Both helpers pre-shift wide operands by
 `excess = bitlen(widest operand) - (126 - S)` (when positive) so the
 shifted values have at most `126 - S` bits:
 
-- `ratio_up`: `n = (num >> excess) + 1 <= 2^(126-S)` and
-  `d = den >> excess < 2^(126-S)`, with a release `assert!(d > 0)`. Then
-  `n << S <= 2^126`, the ceiling bias `+ d - 1` keeps the numerator below
+- `ratio_up` (requires `num <= den`, debug-asserted): `den` is the wider
+  operand, so its own bits set the shift and
+  `d = den >> excess >= 2^(125-S) > 0`, while
+  `n = (num >> excess) + 1 <= 2^(126-S)`. Then `n << S <= 2^126`, the
+  ceiling bias `+ d - 1` keeps the numerator below
   `2^126 + 2^126 = 2^127` (`u128`, fine), and the quotient
   `q <= n << S <= 2^126 < 2^127`, so the cast to `i128` is safe
-  (debug-asserted). The `d > 0` assert is a rounding guard, not an overflow
-  one: `den >> excess == 0` happens only when `num` is the wider operand by
-  more than the pre-shift can carry (a ratio past the `Fixed` range), where
-  clamping `d` up to 1 would silently understate. It halts instead — the
-  documented `spot_price` panic. The fund paths pass `num <= den`, so `den`
-  is the wider operand and `den >> excess >= 1` always (the assert is
-  unreachable there).
+  (debug-asserted).
 - `ratio_down` (requires `num < den`, debug-asserted): `n <= den >> excess
   < d`, so `n << S <= 2^126` as above and the quotient is strictly below
   `ONE` (debug-asserted).
@@ -190,19 +186,7 @@ values in `[0, 2^62]` by constants, clamped by `.max(0)` / `.min(ONE)`.
 
 Step 10 is the exact-out mirror of the payout multiply.
 
-## Ledger: `spot_price` and the `Fixed` wrappers
-
-`spot_price` composes `ratio_up(balance_in, balance_out)` (lemma above,
-result `<= 2^126`) with `wratio = ceil(w_out*2^S / w_in) <= 99 * 2^S <
-2^66.7` through `Fixed::mul_up`. The 256-bit product is at most `2^192.7`;
-whether it survives the `>> S` fit assert and the `i128` cast depends on
-the actual price. Prices beyond the `Fixed` range panic (guarded) — either
-at `ratio_up`'s `d > 0` assert when the balance ratio alone is out of range,
-or at `mul_up`'s fit assert when the weight ratio tips an in-range balance
-ratio over. The function is informational and moves no funds; the panic
-boundary is documented in its rustdoc.
-
-The `Fixed` wrappers themselves:
+## Ledger: the `Fixed` wrappers
 
 - `mul_down` / `mul_up`: `mul_wide` plus the fit assert plus
   `checked_repr` (`< 2^127`). Out-of-range products panic, never wrap.
@@ -227,8 +211,8 @@ their pipeline:
 `mul_wide` has two other call sites, widened for uniformity and sweep
 headroom rather than out of full-width necessity: the pow argument product
 (`< 2^(S+74.1)`, only passes `2^128` at `S >= 54`) and `Fixed::mul_*`
-(reachable at width only through `spot_price`, where the fit assert
-guards). No path performs a 256-bit division anywhere; the widened values
+(no kernel path reaches it at width; the fit assert guards the public
+API). No path performs a 256-bit division anywhere; the widened values
 are only multiplied, added, and shifted.
 
 ## What the proof surfaced
@@ -275,9 +259,9 @@ Now a compile-time assert in `weighted.rs`: `SCALE >= 7`.
 
 These are the guarded bounds, where halting is the specified behavior:
 total deposit past `u128` (`checked_add`), an exact-out payment past
-`u128` (step 10 fit assert), a spot price past `Fixed` (fit assert plus
-`checked_repr`), and the `Fixed` wrapper range asserts. None of them can
-wrap; all fire in release builds regardless of `overflow-checks`.
+`u128` (step 10 fit assert), and the `Fixed` wrapper range asserts. None
+of them can wrap; all fire in release builds regardless of
+`overflow-checks`.
 
 ## How the proof is backed in code
 
@@ -303,8 +287,8 @@ well as debug:
 - `pow_at_the_domain_corners`: maximal `|ln|` times maximal exponent.
 - `exp_saturates_deep_negative`, `exp_total_on_nonpositive`: Finding 1
   regressions over the whole nonpositive `i128` line.
-- `unrepresentable_payment_panics`, `unrepresentable_spot_price_panics`:
-  the guarded boundaries fire as panics in release, not wraps.
+- `unrepresentable_payment_panics`: the guarded boundary fires as a panic
+  in release, not a wrap.
 
 Runs that back this document (all green at `SCALE = 52`):
 
