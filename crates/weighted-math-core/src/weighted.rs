@@ -28,7 +28,9 @@
 //!
 //! # Overflow proof
 //!
-//! With the envelope above, every intermediate fits its type:
+//! The full written proof, with the per-step bound ledger, is
+//! `docs/overflow-proof.md`; this is the summary. With the envelope above,
+//! every intermediate fits its type:
 //! 1. `total = balance_in + amount_in` — `checked_add`, < 2^128 by bound.
 //! 2. `exponent = (weight_in << SCALE) / weight_out` — `weight_in <= 2^64`
 //!    and `SCALE <= 60`, so the numerator is < 2^124; the ratio bound puts
@@ -45,6 +47,15 @@
 
 use crate::fixed::{Fixed, ONE, SCALE};
 use crate::{pow, wide};
+
+// The extreme 1/99 weight ratio must stay a nonzero exponent:
+// floor(2^SCALE / 99) >= 1 requires 2^SCALE >= 99.
+// (a compile-time guard for the sweep, not a runtime assertion)
+#[allow(clippy::assertions_on_constants)]
+const _: () = assert!(
+    SCALE >= 7,
+    "SCALE must be >= 7 so the 1/99 exponent stays nonzero"
+);
 
 /// Amount of `token_out` received for a given `amount_in` of `token_in`.
 ///
@@ -75,6 +86,7 @@ pub fn calc_out_given_in(
 
     // 1 - power at the internal 62-bit scale, rounded down (see pow.rs).
     let omp62 = pow::one_minus_pow_62(base, exponent);
+    debug_assert!((0..=ONE_62).contains(&omp62));
 
     // tokens_out = floor(balance_out * omp62 / 2^62): the widened multiply.
     wide::mul_shr(balance_out, omp62 as u128, pow::LN_SCALE)
@@ -119,10 +131,12 @@ pub fn calc_in_given_out(
     let p62 = pow::pow_62_down(base, exponent);
     // With the 30% cap, p >= 0.7^99 ~ 2^-50.6, four times the pad floor.
     assert!(p62 > 0, "power underflows the internal scale");
+    debug_assert!(p62 <= ONE_62);
 
     // (1 - p)/p at LN_SCALE, rounded up: numerator <= 2^124 fits u128.
     let num = ((ONE_62 - p62) as u128) << pow::LN_SCALE;
     let r62 = (num + p62 as u128 - 1) / p62 as u128;
+    debug_assert!(r62 <= 1 << 124);
 
     // amount_in = ceil(balance_in · r62 / 2^62): the widened multiply. Its
     // fit assertion is the "payment must be representable" envelope.
@@ -164,19 +178,30 @@ fn check_weights(weight_in: u128, weight_out: u128) {
 /// both are pre-shifted down, biased so the ratio can only grow (numerator
 /// rounds up, denominator truncates): the result never understates the true
 /// ratio. The bias costs at most `~2^-73` relative — far below one ulp at
-/// any swept SCALE — except for ratios beyond `2^(126-SCALE)`, which cannot
-/// be represented anyway (downstream fit checks panic).
+/// any swept SCALE.
+///
+/// The pre-shift only preserves the round-up direction while the shifted
+/// denominator keeps at least one bit. Once `den >> excess` truncates to
+/// zero the numerator dwarfs the denominator by more than the 128-bit
+/// division can carry — a ratio far past the `Fixed` range — so the helper
+/// halts rather than clamp the denominator up to 1 (which would silently
+/// *understate* the ratio, the one direction it must never take). The fund
+/// paths never reach this: they pass `num <= den`, so `den` is the wider
+/// operand and its shift never underflows.
 fn ratio_up(num: u128, den: u128) -> Fixed {
     debug_assert!(den > 0);
     let bits = 128 - num.max(den).leading_zeros();
     let excess = bits.saturating_sub(126 - SCALE);
     let (n, d) = if excess > 0 {
-        ((num >> excess) + 1, (den >> excess).max(1))
+        let d = den >> excess;
+        assert!(d > 0, "ratio exceeds the representable Fixed range");
+        ((num >> excess) + 1, d)
     } else {
         (num, den)
     };
-    // n <= 2^(126-SCALE) + 1, so n << SCALE < 2^127 and `+ d - 1` fits.
+    // n <= 2^(126-SCALE), so n << SCALE <= 2^126 and `+ d - 1` fits.
     let q = ((n << SCALE) + d - 1) / d;
+    debug_assert!(q >> 127 == 0, "ratio fits the signed representation");
     Fixed(q as i128)
 }
 
@@ -192,5 +217,7 @@ fn ratio_down(num: u128, den: u128) -> Fixed {
     } else {
         (num, den)
     };
-    Fixed(((n << SCALE) / d) as i128)
+    let q = (n << SCALE) / d;
+    debug_assert!(q < ONE.0 as u128, "num < den keeps the ratio below one");
+    Fixed(q as i128)
 }
