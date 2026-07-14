@@ -1,10 +1,11 @@
 //! Differential tests against the mpmath oracle fixtures.
 //!
 //! Two kinds of test live here (ADR 0002):
-//! - kernel gates: RED until the kernel exists (they panic at `todo!()`),
-//! - grader self-validation: GREEN from day one (grading Balancer's captured
-//!   outputs, and structural sanity of the fixtures themselves). These prove
-//!   the machinery works while the kernel path stays red.
+//! - kernel gates: grade the kernel's outputs against the oracle truths,
+//!   with signed one-sided error bands;
+//! - grader self-validation: grade Balancer's captured outputs and check
+//!   the fixtures' structure. These prove the grading machinery itself,
+//!   independently of the kernel.
 
 use harness::*;
 use weighted_math_core::{fixed, pow, weighted};
@@ -25,7 +26,7 @@ fn assert_band(band: Band, what: &str, context: &dyn std::fmt::Debug) {
 }
 
 // ---------------------------------------------------------------------------
-// GREEN path: the grader validates itself against Balancer + fixture sanity
+// Grader self-validation: Balancer's captured outputs + fixture sanity
 // ---------------------------------------------------------------------------
 
 /// Grades Balancer's captured LogExpMath outputs against the mpmath truth,
@@ -105,7 +106,7 @@ fn grader_pow_fixture_sanity() {
 }
 
 // ---------------------------------------------------------------------------
-// RED path: the kernel gates (panic at todo!() until the kernel exists)
+// Kernel gates
 // ---------------------------------------------------------------------------
 
 /// The primitive gate: pow_up / pow_down at the ulp level, signed one-sided.

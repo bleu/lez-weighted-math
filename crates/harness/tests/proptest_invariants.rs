@@ -2,8 +2,8 @@
 //! whole domain, with danger zones oversampled. CI has no Python, so there
 //! is no answer key for random inputs — accuracy stays with the fixtures.
 //!
-//! Kernel invariants are RED until the kernel exists; the generator-sanity
-//! tests are GREEN today and prove the generators themselves.
+//! The generator-sanity tests at the bottom check the generators themselves,
+//! independently of the kernel.
 
 use proptest::prelude::*;
 
@@ -13,7 +13,7 @@ use weighted_math_core::{pow, weighted};
 const MAX_EXPONENT: i128 = 99 * (1i128 << SCALE);
 
 // ---------------------------------------------------------------------------
-// Generators (danger zones weighted per ADR 0002 / plan decision 10)
+// Generators (danger zones oversampled, ADR 0002)
 // ---------------------------------------------------------------------------
 
 /// LBP-style normalised weight pair: ratio spans exactly 1/99 ..= 99.
@@ -105,7 +105,7 @@ fn small_fixed() -> impl Strategy<Value = Fixed> {
 }
 
 // ---------------------------------------------------------------------------
-// GREEN today: generator sanity
+// Generator sanity
 // ---------------------------------------------------------------------------
 
 proptest! {
@@ -147,7 +147,7 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
-// RED until the kernel exists: kernel invariants
+// Kernel invariants
 // ---------------------------------------------------------------------------
 
 proptest! {

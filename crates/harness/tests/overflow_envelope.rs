@@ -17,10 +17,11 @@ const MAX_EXPONENT: i128 = 99 * ONE.0;
 // Deterministic corners
 // ---------------------------------------------------------------------------
 
-/// Regression for overflow-proof finding 1: `checked_shl` never detects
-/// discarded bits, so deep-negative `exp` arguments used to truncate and
-/// return 1.0 (and `i128::MIN` negated with overflow). All of these must
-/// saturate to the true underflow values.
+/// Regression for Finding 1 in `docs/overflow-proof.md`: an early version
+/// shifted the `exp` argument with `checked_shl`, which never detects
+/// discarded bits — deep-negative arguments truncated and returned 1.0
+/// (and `i128::MIN` negated with overflow). All of these must saturate to
+/// the true underflow values.
 #[test]
 fn exp_saturates_deep_negative() {
     let deep = [
@@ -153,8 +154,8 @@ proptest! {
     }
 
     /// exp/expm1 are total on the whole nonpositive Fixed line — no input
-    /// truncates, wraps, or panics (finding 1 regression, full domain) —
-    /// and they agree with each other to one ulp.
+    /// truncates, wraps, or panics (Finding 1's regression, over the full
+    /// domain) — and they agree with each other to one ulp.
     #[test]
     fn exp_total_on_nonpositive(x in i128::MIN..=0) {
         let e = pow::exp(Fixed(x));
