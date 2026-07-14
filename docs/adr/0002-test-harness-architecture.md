@@ -2,7 +2,7 @@
 
 Status: **ACCEPTED** (Phase 1 grill). Resolves ADR 0001 decisions 1, 5, 6 and
 the scale *method* part of decision 2. Implementation plan:
-`docs/plans/0001-test-harness.md`.
+`docs/archive/plans/0001-test-harness.md`.
 
 ## Context
 

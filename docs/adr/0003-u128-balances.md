@@ -13,7 +13,7 @@ at the working scale; the scaffold signature is unsound.
 
 The platform context reinforces the point: LEZ token amounts are native `u128`
 with no decimals field (`CONTEXT.md`), and the LEE reference AMM does its swap
-math in `u128` (see `docs/handoffs/2026-07-09-i128-vs-i256-decision.md`).
+math in `u128` (the integer-width survey in ADR 0009).
 
 ## Decision
 
@@ -40,7 +40,7 @@ integer wei value.
   obligation.
 - The harness passes raw integers; the kernel forms `base` and `exponent`
   internally.
-- The `weighted.rs` scaffold must be corrected during implementation; this is
-  noted as a build step in `docs/plans/0001-test-harness.md`.
+- The `weighted.rs` signatures had to be corrected during implementation
+  (this was tracked in `docs/archive/plans/0001-test-harness.md`).
 - Matches the Logos platform convention (`u128` money math), which also helps
   the RFP "platform-pattern fluency" criterion.

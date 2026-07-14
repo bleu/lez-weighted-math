@@ -93,9 +93,9 @@ For contrast, a Balancer-style `LogExpMath.pow` runs a couple dozen
 divisions per call (range-reduction ladders plus per-term series divisions).
 At ~2.5k cycles each that is ~60k cycles of division alone, roughly 5x our
 entire buy path. Keeping the kernel at one division per pow is where the
-cycle budget was won; this replaces the estimate in the 2026-07-09 handoff
-("single-digit thousands of cycles per pow") with measured numbers of the
-same order.
+cycle budget was won; this replaces the pre-implementation estimate from the
+integer-width decision (ADR 0009, "single-digit thousands of cycles per pow")
+with measured numbers of the same order.
 
 ## Caveats
 
