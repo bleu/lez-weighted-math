@@ -5,16 +5,17 @@ goal is a small, deterministic, `no_std` Rust implementation of Balancer-style
 weighted-pool swap math — `calcOutGivenIn` / `calcInGivenOut` and the
 underlying fixed-point `pow(base, exponent)` — that produces results provable
 inside a RISC-V zero-knowledge VM, validated for accuracy against a
-high-precision `mpmath` oracle. This repository is currently scaffold only: the
-crate structure, tooling, and design docs are in place, but no math is
-implemented yet.
+high-precision `mpmath` oracle.
 
 ## Layout
 
 - `crates/weighted-math-core` — `no_std` math kernel (`fixed`, `pow`,
-  `weighted` module stubs). No RISC0 dependencies yet.
-- `crates/harness` — dev/test crate for the mpmath oracle bridge, fixtures,
-  `proptest` properties, and `criterion` benchmarks.
+  `weighted`). No RISC0 dependencies; compiles unchanged as a zkVM guest.
+- `crates/harness` — dev/test crate for the mpmath oracle fixtures, the
+  differential grader, and `proptest` properties.
+- `zkvm` — separate workspace: the RISC0 guest build, host-vs-guest bit
+  parity over the fixture set, and cycle measurement (see
+  `docs/zkvm-cycles.md` for the measured cost table).
 - `fuzz` — separate workspace: the coverage-guided curve-invariant fuzz
   target (local-only, see ADR 0008).
 - `CONTEXT.md` — design brief.
