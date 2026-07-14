@@ -1,25 +1,19 @@
 //! Fixed-point scalar type.
 //!
-//! Binary fixed-point (Q-format): a value `x` represents `x / 2^SCALE`.
-//! `SCALE` is a plain const so it can be *swept* against the mpmath oracle
-//! rather than hand-picked; `ONE` is the unit value at the chosen scale.
-//! Binary scaling keeps the hot path on shifts — multiplying or dividing by
-//! `ONE` is free, so `mul_down`/`mul_up` cost zero divisions and
-//! `div_down`/`div_up` cost exactly one hardware division each.
+//! Binary Q-format: a value `x` represents `x / 2^SCALE`. Multiplying or
+//! dividing by `ONE` is a shift, so `mul_*` cost no divisions and `div_*`
+//! cost one each.
 //!
-//! `Repr` is signed (`i128`): `ln x` for `x ∈ (0,1)` is negative and the
-//! `exp` argument is `<= 0`. The directional wrappers below serve the pool
-//! math and are defined on **nonnegative** operands only (asserted): in the
-//! kernel, `Fixed` carries ratios, weights-ratios, and powers — balances
-//! stay raw `u128` (ADR 0003).
+//! `Repr` is signed because `ln` results are negative. The wrappers below
+//! are defined on nonnegative operands only (asserted); balances stay raw
+//! `u128` (ADR 0003).
 
 use crate::wide;
 
 /// Binary scale: the fixed-point value `x` represents `x / 2^SCALE`.
 ///
-/// Sweepable: change this const to trade precision against cycle cost. The
-/// harness re-grades at the new scale with no fixture regeneration
-/// (mechanism in ADR 0002; the choice of 52 in ADR 0004).
+/// Sweepable against the oracle with no fixture regeneration (ADR 0002);
+/// 52 was chosen by the sweep (ADR 0004).
 pub const SCALE: u32 = 52;
 
 /// Backing integer representation for a fixed-point value.
@@ -33,11 +27,8 @@ pub struct Fixed(pub Repr);
 pub const ONE: Fixed = Fixed(1_i128 << SCALE);
 
 impl Fixed {
-    /// Fixed-point multiplication rounded down: `floor(self · rhs / 2^SCALE)`.
-    ///
-    /// The product is formed at 256 bits, so the only overflow surface is
-    /// the *result* exceeding `Repr` — which panics (envelope violation)
-    /// rather than wrapping.
+    /// `floor(self · rhs / 2^SCALE)`. The product is formed at 256 bits;
+    /// a result past `Repr` panics, never wraps.
     pub fn mul_down(self, rhs: Fixed) -> Fixed {
         Fixed(checked_repr(wide::mul_shr(
             nonneg(self),
@@ -46,7 +37,7 @@ impl Fixed {
         )))
     }
 
-    /// Fixed-point multiplication rounded up: `ceil(self · rhs / 2^SCALE)`.
+    /// `ceil(self · rhs / 2^SCALE)`.
     pub fn mul_up(self, rhs: Fixed) -> Fixed {
         Fixed(checked_repr(wide::mul_shr_up(
             nonneg(self),
@@ -55,16 +46,13 @@ impl Fixed {
         )))
     }
 
-    /// Fixed-point division rounded down: `floor(self · 2^SCALE / rhs)`.
-    ///
-    /// One hardware division. The numerator `self << SCALE` must fit u128,
-    /// bounding `self < 2^(128 - 2·SCALE)` in value — ample for the
-    /// kernel's ratio/weight domain (asserted, not wrapped).
+    /// `floor(self · 2^SCALE / rhs)` — one division. The numerator must
+    /// fit `u128` (asserted).
     pub fn div_down(self, rhs: Fixed) -> Fixed {
         Fixed(checked_repr(numerator(self, rhs) / nonneg(rhs)))
     }
 
-    /// Fixed-point division rounded up: `ceil(self · 2^SCALE / rhs)`.
+    /// `ceil(self · 2^SCALE / rhs)`.
     pub fn div_up(self, rhs: Fixed) -> Fixed {
         let d = nonneg(rhs);
         let n = numerator(self, rhs);
@@ -72,8 +60,7 @@ impl Fixed {
         Fixed(checked_repr((n + d - 1) / d))
     }
 
-    /// The complement `ONE - self`, saturating at zero for `self > ONE`.
-    /// Exact: pure integer subtraction, no rounding direction to choose.
+    /// `ONE - self`, saturating at zero. Exact integer subtraction.
     pub fn complement(self) -> Fixed {
         Fixed((ONE.0 - nonneg(self) as i128).max(0))
     }

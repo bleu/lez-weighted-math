@@ -33,7 +33,7 @@ Balancer. `pow_up`/`pow_down` stay within 4 ulps of the true value at
 `2^-52` (measured worst case: 2, the deliberate directional pad), on the
 pool-safe side only — a result on the fund-losing side of true fails the
 suite regardless of magnitude. The sweep table behind the numbers is in
-ADR 0004; the written error analysis is the `pow` module doc.
+ADR 0004; the written error analysis is `docs/error-analysis.md`.
 
 ## How correctness is established
 

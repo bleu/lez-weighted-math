@@ -1,9 +1,7 @@
 //! Widening 128-bit multiply primitives.
 //!
-//! On the RV32IM target a `u128` is already multi-limb, so a full
-//! `128x128 -> 256` product is just a handful of word multiplies — not a
-//! special regime. What the kernel *never* does is a 256-bit division
-//! (division is the most expensive zkVM primitive); these helpers only
+//! A full `128x128 -> 256` product is cheap on RV32IM (`u128` is already
+//! multi-limb). The kernel never divides at 256 bits; these helpers only
 //! multiply, add, and shift.
 
 /// Full `128x128 -> 256`-bit product as `(hi, lo)`.
@@ -22,10 +20,9 @@ pub(crate) const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
     (hi, lo)
 }
 
-/// `floor(a * b / 2^shift)` for `0 < shift < 128`.
-///
-/// Panics if the shifted product does not fit `u128`; every call site must
-/// argue it fits (the overflow proof lives at those call sites).
+/// `floor(a * b / 2^shift)` for `0 < shift < 128`. Panics if the result
+/// does not fit `u128`; each call site's fit argument is in
+/// `docs/overflow-proof.md`.
 pub(crate) fn mul_shr(a: u128, b: u128, shift: u32) -> u128 {
     debug_assert!(shift > 0 && shift < 128);
     let (hi, lo) = mul_wide(a, b);
@@ -33,7 +30,7 @@ pub(crate) fn mul_shr(a: u128, b: u128, shift: u32) -> u128 {
     (hi << (128 - shift)) | (lo >> shift)
 }
 
-/// `ceil(a * b / 2^shift)` for `0 < shift < 128`, same fit requirement.
+/// Ceiling variant of [`mul_shr`], same fit requirement.
 pub(crate) fn mul_shr_up(a: u128, b: u128, shift: u32) -> u128 {
     debug_assert!(shift > 0 && shift < 128);
     let (hi, lo) = mul_wide(a, b);

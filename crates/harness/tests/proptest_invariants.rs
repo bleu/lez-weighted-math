@@ -65,10 +65,8 @@ fn any_swap() -> impl Strategy<Value = (u128, u128, u128, (u128, u128))> {
     prop_oneof![2 => sale_start_swap(), 3 => swap()]
 }
 
-/// An exact-out trade. `amount_out` respects the kernel's 30% out-ratio cap
-/// and additionally `exponent · drain_fraction <= 1/4`, which keeps the
-/// required payment below ~b_in/2 so it always fits u128 (the kernel's
-/// "payment must be representable" envelope).
+/// An exact-out trade inside the 30% cap, with additionally
+/// `exponent · drain_fraction <= 1/4` so the payment always fits u128.
 fn exact_out_swap() -> impl Strategy<Value = (u128, u128, u128, (u128, u128))> {
     (balance(), balance(), weights()).prop_flat_map(|(balance_in, balance_out, (w_in, w_out))| {
         let cap30 = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
@@ -151,9 +149,8 @@ proptest! {
 // ---------------------------------------------------------------------------
 
 proptest! {
-    /// pow output lives in (0,1]; directional variants bracket each other.
-    /// Running at all is the empirical no-panic/no-overflow companion to the
-    /// written overflow proof.
+    /// pow output lives in (0,1] and the directional variants bracket each
+    /// other; running at all is the no-panic companion to the overflow proof.
     #[test]
     fn pow_bounds_and_rounding((base, expo) in pow_input()) {
         let up = pow::pow_up(base, expo);
@@ -214,8 +211,7 @@ proptest! {
         prop_assert!(out <= balance_out);
     }
 
-    /// Paying more in never yields less out (weak monotonicity), so the
-    /// payout function cannot be gamed by splitting or inflating trades.
+    /// Paying more in never yields less out.
     #[test]
     fn calc_out_monotone_in_amount(
         (balance_in, amount_in, balance_out, (w_in, w_out)) in any_swap(),
@@ -242,11 +238,9 @@ proptest! {
     }
 
     /// The curve value `b_in^w_in * b_out^w_out` never decreases across an
-    /// exact-in trade (ADR 0008). This is the end-to-end fund-safety
-    /// statement all the per-step rounding directions exist to guarantee;
-    /// the referee is exact bigint arithmetic, independent of the kernel.
-    /// Equality is allowed — zero-fee math holds the curve constant, so an
-    /// exactly-representable trade can land on it.
+    /// exact-in trade (ADR 0008) — the end-to-end fund-safety statement,
+    /// judged by an exact bigint referee. Equality is allowed (zero-fee
+    /// math holds the curve constant).
     #[test]
     fn invariant_never_decreases_exact_in(
         (balance_in, amount_in, balance_out, (w_in, w_out)) in any_swap(),
@@ -258,9 +252,8 @@ proptest! {
         );
     }
 
-    /// Same statement for exact-out: the payment charged always covers the
-    /// tokens withdrawn. This guards the ADR 0007 inversion, where every
-    /// rounding direction flips once — the likeliest place for a leak.
+    /// Same statement for exact-out. Guards the ADR 0007 inversion, where
+    /// every rounding direction flips once.
     #[test]
     fn invariant_never_decreases_exact_out(
         (balance_in, amount_out, balance_out, (w_in, w_out)) in exact_out_swap(),

@@ -148,16 +148,13 @@ pub fn parse_u128(s: &str) -> u128 {
 }
 
 /// Parses a decimal integer, or `None` if it exceeds `u128`. Sensitivity
-/// fields can exceed u128 on extreme cases (deep-drain trades where the
-/// payout is pinned near the whole reserve); `None` means the magnitude
-/// gate has no meaningful first-order bound there and is skipped, while
-/// the direction gate stays strict.
+/// fields can exceed u128 on deep-drain cases; `None` skips the magnitude
+/// gate there while the direction gate stays strict.
 pub fn parse_u128_checked(s: &str) -> Option<u128> {
     s.parse().ok()
 }
 
 // Fixture inputs are exact only for scales at or above the dyadic grid.
-// (a compile-time guard for the sweep, not a runtime assertion)
 #[allow(clippy::assertions_on_constants)]
 const _: () = assert!(SCALE >= S40_BITS, "SCALE must be >= the fixture grid");
 
@@ -170,10 +167,7 @@ pub fn s40_to_fixed(s40: &str) -> Fixed {
 }
 
 /// The reference value's floor and ceiling on the `2^-SCALE` grid, from a
-/// `floor(value * 2^qbits)` fixture field. Because the fixture q-value is
-/// itself a floor of the (irrational) truth, `floor` here is exact and
-/// `ceil` errs at most one ulp high only when the truth is exactly on the
-/// grid — which transcendental truths never are.
+/// `floor(value * 2^qbits)` fixture field.
 pub fn q_to_scale_bounds(q: &str, qbits: u32) -> (i128, i128) {
     assert!(qbits >= SCALE);
     let q = parse_u128(q);
@@ -267,15 +261,10 @@ pub fn check_two_sided(t_floor: i128, t_ceil: i128, actual: i128, bound_ulps: u1
 // ---------------------------------------------------------------------------
 
 /// Does the trade keep the curve value `b_in^w_in * b_out^w_out` from
-/// decreasing? Checked with exact big-integer arithmetic: both sides are
-/// products of u128 values raised to small integer weights (~12.7k bits at
-/// weight 99), so the comparison has no rounding of its own. A `false` is a
-/// real fund leak, never a referee artifact — and the referee shares no code
-/// with the kernel, so a kernel bug cannot vouch for itself.
-///
-/// Weights are the raw integer units the generators use, capped at 99 so
-/// they can be exponents here. Kernel behaviour only depends on the weight
-/// ratio, and every ratio p/q with p, q <= 99 is reachable at this cap.
+/// decreasing? Exact big-integer comparison with no rounding of its own
+/// and no code shared with the kernel: a `false` is a real fund leak
+/// (ADR 0008). Weights must be integers in 1..=99 so they can be
+/// exponents here.
 pub fn invariant_preserved(
     balance_in: u128,
     weight_in: u128,

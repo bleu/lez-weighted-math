@@ -1,10 +1,8 @@
-//! Overflow-envelope hammer tests backing `docs/overflow-proof.md`.
+//! Overflow-envelope tests backing `docs/overflow-proof.md`.
 //!
-//! Release builds wrap silently, so this file is written to run in BOTH
-//! profiles (`cargo test` and `cargo test --release`). Every check is an
-//! invariant that a wrapped intermediate would break loudly, plus
-//! `should_panic` tests proving the hard envelope asserts fire in release
-//! instead of wrapping.
+//! Runs in both debug and release (release wraps silently). Each check is
+//! an invariant a wrapped intermediate would break; the `should_panic`
+//! tests prove the envelope asserts fire in release.
 
 use proptest::prelude::*;
 
@@ -17,11 +15,9 @@ const MAX_EXPONENT: i128 = 99 * ONE.0;
 // Deterministic corners
 // ---------------------------------------------------------------------------
 
-/// Regression for Finding 1 in `docs/overflow-proof.md`: an early version
-/// shifted the `exp` argument with `checked_shl`, which never detects
-/// discarded bits — deep-negative arguments truncated and returned 1.0
-/// (and `i128::MIN` negated with overflow). All of these must saturate to
-/// the true underflow values.
+/// Finding 1 regression (docs/overflow-proof.md): deep-negative `exp`
+/// arguments once truncated via `checked_shl` and returned 1.0. All of
+/// these must saturate to the true underflow values.
 #[test]
 fn exp_saturates_deep_negative() {
     let deep = [
@@ -38,8 +34,8 @@ fn exp_saturates_deep_negative() {
     }
 }
 
-/// The pow domain corners: maximal |ln| times maximal exponent is the worst
-/// case of the widened argument product inside `pow_raw`.
+/// Domain corners: maximal |ln| times maximal exponent is the worst case
+/// of the widened argument product.
 #[test]
 fn pow_at_the_domain_corners() {
     let corners = [
@@ -56,9 +52,8 @@ fn pow_at_the_domain_corners() {
     }
 }
 
-/// A payment past u128 must halt at the widened multiply's fit assert —
-/// in release too — never wrap. w_out/w_in = 99 with a full 30% drain puts
-/// p near 2^-51, so the payment is ~2^51 · balance_in.
+/// A payment past u128 must halt at the fit assert in release, never
+/// wrap. Here the payment is ~2^51 · balance_in.
 #[test]
 #[should_panic(expected = "widened product exceeds u128")]
 fn unrepresentable_payment_panics() {
@@ -66,18 +61,17 @@ fn unrepresentable_payment_panics() {
     weighted::calc_in_given_out(b, 1, b, 99, b / 10 * 3);
 }
 
-/// Spot price beyond the `Fixed` range, where the balance ratio itself is
-/// representable (2^70) but the 99/1 weight tips the final `mul_up` over u128.
+/// Spot price past `Fixed`: the balance ratio is representable but the
+/// 99/1 weight tips the final `mul_up` over u128.
 #[test]
 #[should_panic(expected = "widened product exceeds u128")]
 fn unrepresentable_spot_price_panics() {
     weighted::spot_price(1u128 << 120, 1, 1u128 << 50, 99);
 }
 
-/// Spot price beyond range through the balance ratio alone. Equal weights
-/// leave the final `mul_up` in range, so this has to be caught earlier, in
-/// the ratio itself — otherwise it silently understates (true price 2^120,
-/// far past the ~2^75 `Fixed` limit) instead of halting.
+/// Spot price past `Fixed` through the balance ratio alone: equal weights
+/// keep `mul_up` in range, so the ratio itself must halt instead of
+/// silently understating.
 #[test]
 #[should_panic(expected = "ratio exceeds the representable Fixed range")]
 fn unrepresentable_spot_price_panics_in_ratio() {
@@ -98,11 +92,9 @@ fn edge_weights() -> impl Strategy<Value = (u128, u128)> {
 }
 
 proptest! {
-    /// Total deposit pinned to the absolute edge: balance_in + amount_in
-    /// == 2^128 - 1 exactly, balances up to full width. When the trade at
-    /// least doubles the reserve, base <= ~1/2 and exponent >= ~1/99, so
-    /// 1 - power >= ~0.00697: a wrapped intermediate could not keep the
-    /// payout above balance_out/256.
+    /// Total deposit pinned to exactly 2^128 - 1. When the trade at least
+    /// doubles the reserve, 1 - power >= ~0.00697, so a wrapped
+    /// intermediate could not keep the payout above balance_out/256.
     #[test]
     fn calc_out_at_the_deposit_edge(
         balance_in in 1u128..u128::MAX,
@@ -117,10 +109,9 @@ proptest! {
         }
     }
 
-    /// The payout multiply is linear in balance_out (omp62 does not depend
-    /// on it): doubling the reserve doubles the payout up to one floor ulp.
-    /// This pins the full-width widened multiply near 2^127 — any wrap in
-    /// it breaks exact 2x scaling.
+    /// The payout multiply is linear in balance_out: doubling the reserve
+    /// doubles the payout up to one floor ulp. Pins the widened multiply
+    /// near 2^127, where a wrap breaks exact 2x scaling.
     #[test]
     fn payout_multiply_is_linear_in_balance_out(
         balance_in in (1u128 << 64)..(1u128 << 126),
@@ -134,10 +125,8 @@ proptest! {
         prop_assert!(twice == 2 * once || twice == 2 * once + 1);
     }
 
-    /// Mirror for the exact-out payment multiply, linear in balance_in
-    /// (r62 does not depend on it). w_out <= w_in keeps the exponent <= 1,
-    /// so with the 30% cap the payment stays under ~0.43 * balance_in and
-    /// the doubled call still fits u128.
+    /// Exact-out mirror: the payment multiply is linear in balance_in.
+    /// w_out <= w_in plus the 30% cap keep the doubled call inside u128.
     #[test]
     fn payment_multiply_is_linear_in_balance_in(
         balance_in in (1u128 << 64)..(1u128 << 126),
@@ -153,9 +142,8 @@ proptest! {
         prop_assert!(twice == 2 * once || twice + 1 == 2 * once);
     }
 
-    /// exp/expm1 are total on the whole nonpositive Fixed line — no input
-    /// truncates, wraps, or panics (Finding 1's regression, over the full
-    /// domain) — and they agree with each other to one ulp.
+    /// exp/expm1 are total on the whole nonpositive line (Finding 1, full
+    /// domain) and agree with each other to one ulp.
     #[test]
     fn exp_total_on_nonpositive(x in i128::MIN..=0) {
         let e = pow::exp(Fixed(x));

@@ -1,11 +1,7 @@
-//! Differential tests against the mpmath oracle fixtures.
-//!
-//! Two kinds of test live here (ADR 0002):
-//! - kernel gates: grade the kernel's outputs against the oracle truths,
-//!   with signed one-sided error bands;
-//! - grader self-validation: grade Balancer's captured outputs and check
-//!   the fixtures' structure. These prove the grading machinery itself,
-//!   independently of the kernel.
+//! Differential tests against the mpmath oracle fixtures (ADR 0002):
+//! kernel gates with signed one-sided error bands, plus grader
+//! self-validation (Balancer's captured outputs, fixture sanity) proving
+//! the machinery independently of the kernel.
 
 use harness::*;
 use weighted_math_core::{fixed, pow, weighted};
@@ -29,10 +25,9 @@ fn assert_band(band: Band, what: &str, context: &dyn std::fmt::Debug) {
 // Grader self-validation: Balancer's captured outputs + fixture sanity
 // ---------------------------------------------------------------------------
 
-/// Grades Balancer's captured LogExpMath outputs against the mpmath truth,
-/// within Balancer's own documented accuracy (1e-14 relative + 2 wei of its
-/// 1e-18 grid). Green here proves the fixture plumbing and the band-checking
-/// machinery on a real, working implementation of this math.
+/// Grades Balancer's captured outputs against the mpmath truth within
+/// Balancer's own accuracy (1e-14 relative + 2 wei). Proves the fixture
+/// plumbing and band checking on a real implementation of this math.
 #[test]
 fn grader_validates_balancer_capture() {
     let inputs: Vec<BalancerInput> = load_fixture("balancer_inputs.json");
@@ -175,9 +170,8 @@ fn kernel_ln_exp_diagnostics() {
     }
 }
 
-/// The fixed-point bricks: exact directional rounding, checked against the
-/// true rational at double width. No error allowance at all — these are
-/// pure integer operations and must be exactly correctly rounded.
+/// The fixed-point wrappers must be exactly correctly rounded: pure
+/// integer operations, checked against the true rational at double width.
 #[test]
 fn kernel_arith_wrappers() {
     let cases: Vec<ArithCase> = load_fixture("arith.json");
@@ -231,10 +225,9 @@ fn kernel_arith_wrappers() {
     }
 }
 
-/// The reverse economic gate: the ceiled payment in wei. Direction is
-/// absolute (never undercharge — that is the fund-loss surface for exact-out
-/// trades); magnitude mirrors the out gate, with an extra first-order term
-/// for the kernel's own power error (`sens_pow · bound_ulps · 2^-SCALE`).
+/// The reverse economic gate: the ceiled payment in wei. Never
+/// undercharge (absolute); magnitude mirrors the out gate plus a term for
+/// the kernel's own power error.
 #[test]
 fn kernel_in_given_out_gate() {
     let cases: Vec<InGivenOutCase> = load_fixture("in_given_out.json");
@@ -259,9 +252,7 @@ fn kernel_in_given_out_gate() {
             "UNDERCHARGE (fund leak): kernel {amount_in} < truth {truth} in {c:?}"
         );
 
-        // Magnitude: input-formation sensitivities (doubled for curvature)
-        // plus the kernel's power-error and grid terms. Sensitivities beyond
-        // u128 mean the case is direction-only (deep-drain corner).
+        // Sensitivities beyond u128 mean the case is direction-only.
         let sens = parse_u128_checked(&c.sens_base_wei)
             .and_then(|a| parse_u128_checked(&c.sens_exp_wei).and_then(|b| a.checked_add(b)));
         let sens_pow = parse_u128_checked(&c.sens_pow_wei);
@@ -289,10 +280,9 @@ fn wide_shr_or_max(sens_pow: u128, ulps: u128) -> u128 {
     }
 }
 
-/// Spot price: exact rational band check, no oracle value needed. The
-/// implementation composes two up-rounded steps (reserve ratio, weight
-/// ratio), so it is >= the true rational (direction, checked exactly at
-/// double width) and within a small computable band above it.
+/// Spot price against the exact rational at double width: never below the
+/// truth, and within a small computable band above it. No oracle fixture
+/// needed.
 #[test]
 fn kernel_spot_price_check() {
     let cases: Vec<OutGivenInCase> = load_fixture("out_given_in.json");
@@ -383,10 +373,9 @@ fn measure_error_margins() {
     println!("payout worst shortfall = {worst_rel_num} reserve-ulps (balance_out * 2^-SCALE)");
 }
 
-/// The economic gate: the floored payout in wei. Direction is absolute
-/// (never overpay — that is the fund-loss surface); magnitude is bounded by
-/// first-order input-formation sensitivity plus the kernel allowance, all
-/// parametric in SCALE.
+/// The economic gate: the floored payout in wei. Never overpay
+/// (absolute); magnitude bounded by first-order sensitivities plus the
+/// kernel allowance, parametric in SCALE.
 #[test]
 fn kernel_out_given_in_gate() {
     let cases: Vec<OutGivenInCase> = load_fixture("out_given_in.json");
@@ -412,12 +401,9 @@ fn kernel_out_given_in_gate() {
         );
         assert!(tokens_out <= balance_out, "payout exceeds reserve in {c:?}");
 
-        // Magnitude: base is formed with one directed rounding (<= 1 ulp) and
-        // the exponent likewise; first-order sensitivities convert those to
-        // wei, doubled for curvature headroom. The kernel's own pow error
-        // adds bound_ulps() of balance_out. Sensitivities beyond u128 mean
-        // no meaningful first-order bound exists for the case (deep-drain
-        // trades); the direction gate above still applies in full.
+        // Input-formation sensitivities (doubled for curvature) plus the
+        // kernel's own pow allowance. Sensitivities beyond u128 mean the
+        // case is direction-only.
         let sens = parse_u128_checked(&c.sens_base_wei)
             .and_then(|a| parse_u128_checked(&c.sens_exp_wei).and_then(|b| a.checked_add(b)));
         if let Some(sens) = sens {

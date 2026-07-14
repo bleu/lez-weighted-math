@@ -164,7 +164,7 @@ saturate at `64 * 2^62 = 2^68` (see Finding 1).
 | reduced `s` | `in [0, 0.6932 * 2^62)` | loop postcondition |
 | Horner `acc` | `<= 3.27 * 2^62 < 2^64` | recurrence `|acc'| <= 2^62 + |acc| * 0.6932` closes at `2^62 / (1 - 0.6932)` |
 | `acc * s` | `< 2.27 * 2^124 < 2^126` | |
-| final `acc` | `in [0, 2^62]` | upper: the depth-1 Horner partial equals `2^62 * (-1 + s'/2! - s'^2/3! + ...) <= -0.57 * 2^62` for `s' in [0, 0.694]` (rounding shifts it by `< 40` units), so the last step adds a negative correction to `C0 = 2^62`; lower: the error analysis in the module docs keeps `acc` within `~20` units of `2^62 * exp(-s) >= 0.5 * 2^62` |
+| final `acc` | `in [0, 2^62]` | upper: the depth-1 Horner partial equals `2^62 * (-1 + s'/2! - s'^2/3! + ...) <= -0.57 * 2^62` for `s' in [0, 0.694]` (rounding shifts it by `< 40` units), so the last step adds a negative correction to `C0 = 2^62`; lower: the error analysis (`docs/error-analysis.md`) keeps `acc` within `~20` units of `2^62 * exp(-s) >= 0.5 * 2^62` |
 | `acc >> k` | `<= acc` | `k <= 62` here (larger `k` returned 0 already), so the shift amount is valid |
 
 ### Final rounding

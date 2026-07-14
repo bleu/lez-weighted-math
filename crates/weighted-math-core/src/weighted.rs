@@ -1,56 +1,22 @@
-//! Weighted-pool swap math (Balancer-style) built on top of [`crate::pow`].
+//! Weighted-pool swap math (Balancer-style) built on [`crate::pow`].
 //!
-//! Balances, amounts, and weights cross this API as **raw `u128`** — the LEZ
-//! native token unit (no decimals field). `Fixed` appears only where the
-//! math needs a fractional value in a bounded range: the ratio
-//! `base = balance_in / (balance_in + amount_in)` and the exponent
-//! `weight_in / weight_out`. See ADR 0003.
+//! Balances, amounts, and weights are raw `u128` — the LEZ native token
+//! unit. `Fixed` is used only for the base ratio and the weight-ratio
+//! exponent (ADR 0003).
 //!
-//! Every rounding favours the pool. The composition (mirroring Balancer's
-//! `computeOutGivenExactIn`, adapted to raw-integer balances):
-//! - `base` rounds UP: `power = base^y` is overstated, `1 - power`
-//!   understated, payout understated;
-//! - `exponent` rounds DOWN: with `base < 1`, a smaller exponent also
-//!   overstates the power;
-//! - `1 - power` is padded down inside the kernel pipeline;
-//! - the final payout multiply floors.
-//! So the kernel payout never exceeds the true one.
+//! Every rounding favours the pool: base up, exponent down, `1 - power`
+//! padded down, final payout multiply floored — the payout never exceeds
+//! the true value. `calc_in_given_out` is inverted into the same
+//! `base ∈ (0,1)` domain (ADR 0007); `spot_price` needs no `pow` at all.
 //!
-//! `calc_in_given_out` naively needs `pow` with base > 1, which this kernel
-//! does not support (`base ∈ (0,1)` is what deletes the large-argument `exp`
-//! machinery). Instead it is algebraically inverted into the native domain —
-//! see its docs and ADR 0007. `spot_price` needs no `pow` at all.
-//!
-//! # Enforced envelope (asserted, so violations panic instead of wrapping)
-//!
-//! - reserves >= 1 wei; total deposit `balance_in + amount_in < 2^128`;
-//! - weights >= 1, each <= 2^64, ratio within `[1/99, 99]`.
-//!
-//! # Overflow proof
-//!
-//! The full written proof, with the per-step bound ledger, is
-//! `docs/overflow-proof.md`; this is the summary. With the envelope above,
-//! every intermediate fits its type:
-//! 1. `total = balance_in + amount_in` — `checked_add`, < 2^128 by bound.
-//! 2. `exponent = (weight_in << SCALE) / weight_out` — `weight_in <= 2^64`
-//!    and `SCALE <= 60`, so the numerator is < 2^124; the ratio bound puts
-//!    the result in `[2^SCALE/99, 99·2^SCALE]` ⊂ i128.
-//! 3. `base` (see [`ratio_up`]) — operands are pre-shifted so the numerator
-//!    stays < 2^127 and the `+ d - 1` ceiling bias cannot overflow.
-//! 4. inside `pow`: see the analysis in [`crate::pow`] (widened multiply
-//!    for `y·ln x`; every series product bounded below 2^125).
-//! 5. `balance_out · omp62` — the one place a 256-bit intermediate is
-//!    genuinely needed: `balance_out < 2^128` times `omp62 <= 2^62` is up
-//!    to 2^190, handled by the widening multiply and shifted back down by
-//!    62, so the result is at most `balance_out`. This is the localized
-//!    `128×128 → 256` multiply the design brief calls for.
+//! Envelope (asserted; violations panic, never wrap): reserves >= 1 wei,
+//! total deposit < 2^128, weights in `[1, 2^64]` with ratio in
+//! `[1/99, 99]`. The per-step overflow ledger is `docs/overflow-proof.md`.
 
 use crate::fixed::{Fixed, ONE, SCALE};
 use crate::{pow, wide};
 
-// The extreme 1/99 weight ratio must stay a nonzero exponent:
-// floor(2^SCALE / 99) >= 1 requires 2^SCALE >= 99.
-// (a compile-time guard for the sweep, not a runtime assertion)
+// The 1/99 weight ratio must stay a nonzero exponent: 2^SCALE >= 99.
 #[allow(clippy::assertions_on_constants)]
 const _: () = assert!(
     SCALE >= 7,
@@ -81,9 +47,8 @@ const _: () = assert!(
 ///
 /// # Panics
 ///
-/// On envelope violations (never wraps): an empty reserve, a total deposit
-/// `balance_in + amount_in` past `u128`, a zero weight, a weight above
-/// `2^64`, or a weight ratio outside `[1/99, 99]`.
+/// On envelope violations: empty reserve, total deposit past `u128`, or
+/// weights outside `[1, 2^64]` / ratio outside `[1/99, 99]`.
 pub fn calc_out_given_in(
     balance_in: u128,
     weight_in: u128,
@@ -117,11 +82,10 @@ pub fn calc_out_given_in(
 ///
 /// `in = balance_in * ((balance_out / (balance_out - amount_out))^(weight_out / weight_in) - 1)`
 ///
-/// Rounded up (the pool never undercharges). Internally the base-above-one
-/// form is inverted into the kernel's native domain:
-/// `(b/(b-a))^y - 1 = (1-p)/p` with `p = ((b-a)/b)^y ∈ (0,1)`, so every
-/// rounding direction flips once: base' DOWN, exponent UP, power padded
-/// DOWN — all of which overstate the payment.
+/// Rounded up: the pool never undercharges. The base-above-one form is
+/// inverted into the kernel's `(0,1)` domain via
+/// `(b/(b-a))^y - 1 = (1-p)/p`, flipping every rounding direction once
+/// (ADR 0007).
 ///
 /// ```
 /// use weighted_math_core::weighted::calc_in_given_out;
@@ -139,12 +103,8 @@ pub fn calc_out_given_in(
 ///
 /// # Panics
 ///
-/// On the [`calc_out_given_in`] envelope violations, plus two of its own
-/// (ADR 0007): `amount_out` above 30% of the reserve (Balancer's
-/// `MAX_OUT_RATIO` parity; also keeps the power far above the kernel's pad
-/// floor), and a payment past `u128` (the widened multiply's fit assertion
-/// — a start-of-sale purchase of 30% of the tokens can genuinely price
-/// beyond `2^128` wei, and the pool refuses rather than wraps).
+/// As [`calc_out_given_in`], plus: `amount_out` above 30% of the reserve,
+/// or a payment past `u128` (ADR 0007).
 pub fn calc_in_given_out(
     balance_in: u128,
     weight_in: u128,
@@ -177,22 +137,19 @@ pub fn calc_in_given_out(
     let r62 = (num + p62 as u128 - 1) / p62 as u128;
     debug_assert!(r62 <= 1 << 124);
 
-    // amount_in = ceil(balance_in · r62 / 2^62): the widened multiply. Its
-    // fit assertion is the "payment must be representable" envelope.
+    // ceil(balance_in · r62 / 2^62); the fit assert is the payment envelope.
     wide::mul_shr_up(balance_in, r62, pow::LN_SCALE)
 }
 
 /// Spot price of `token_in` in terms of `token_out` (ignoring swap fees):
 /// `(balance_in / weight_in) / (balance_out / weight_out)`, rounded up.
 ///
-/// Informational (no funds move on it): composed from two up-rounded
-/// ratios, so it never understates the true price and sits within a few
-/// ulps above it (checked exactly by the harness at double width).
+/// Informational (no funds move on it). Never understates the true price
+/// and sits within a few ulps above it (checked exactly by the harness).
 ///
 /// # Panics
 ///
-/// On the shared weight/reserve envelope violations, and if the price
-/// exceeds the `Fixed` range.
+/// On the shared envelope violations, or a price past the `Fixed` range.
 pub fn spot_price(balance_in: u128, weight_in: u128, balance_out: u128, weight_out: u128) -> Fixed {
     assert!(balance_in >= 1 && balance_out >= 1, "empty reserve");
     check_weights(weight_in, weight_out);
@@ -214,23 +171,14 @@ fn check_weights(weight_in: u128, weight_out: u128) {
     );
 }
 
-/// `num / den` as a `Fixed`, rounded UP, for operands of full `u128` range —
-/// one hardware division. `num` may exceed `den` (spot-price ratios).
+/// `num / den` as a `Fixed`, rounded up — one division. `num` may exceed
+/// `den` (spot-price ratios).
 ///
-/// When the operands are too wide for the `num << SCALE` numerator to fit,
-/// both are pre-shifted down, biased so the ratio can only grow (numerator
-/// rounds up, denominator truncates): the result never understates the true
-/// ratio. The bias costs at most `~2^-73` relative — far below one ulp at
-/// any swept SCALE.
-///
-/// The pre-shift only preserves the round-up direction while the shifted
-/// denominator keeps at least one bit. Once `den >> excess` truncates to
-/// zero the numerator dwarfs the denominator by more than the 128-bit
-/// division can carry — a ratio far past the `Fixed` range — so the helper
-/// halts rather than clamp the denominator up to 1 (which would silently
-/// *understate* the ratio, the one direction it must never take). The fund
-/// paths never reach this: they pass `num <= den`, so `den` is the wider
-/// operand and its shift never underflows.
+/// Wide operands are pre-shifted down, biased so the result can only
+/// round up (cost `< 2^-73` relative). A denominator that shifts to zero
+/// means the ratio is past the `Fixed` range: the helper panics rather
+/// than understate it. The fund paths pass `num <= den` and never hit
+/// this.
 fn ratio_up(num: u128, den: u128) -> Fixed {
     debug_assert!(den > 0);
     let bits = 128 - num.max(den).leading_zeros();
@@ -248,9 +196,8 @@ fn ratio_up(num: u128, den: u128) -> Fixed {
     Fixed(q as i128)
 }
 
-/// `num / den` as a `Fixed`, rounded DOWN, for `num < den` — the mirror of
-/// [`ratio_up`]: the pre-shift bias truncates the numerator and rounds the
-/// denominator up, so the result never overstates the true ratio.
+/// `num / den` as a `Fixed`, rounded down, for `num < den` — the mirror
+/// of [`ratio_up`].
 fn ratio_down(num: u128, den: u128) -> Fixed {
     debug_assert!(num < den);
     let den_bits = 128 - den.leading_zeros();
