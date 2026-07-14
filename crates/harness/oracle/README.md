@@ -38,7 +38,7 @@ python3 gen.py
   `spot_price` is likewise checked against the exact rational at double
   width (over the `out_given_in.json` inputs), so it needs no fixture.
 - `scales.json` — the quantization floor per candidate `SCALE` for the
-  sweep (ADR 0001 decision 2).
+  scale sweep (mechanism in ADR 0002; result in ADR 0004).
 - `balancer_inputs.json` — the pow cases rounded onto Balancer's 1e18 grid,
   with truth recomputed at that grid and out-of-domain cases marked `skip`.
   `../balancer-ref/inputs_flat.json` is the same data flattened for the

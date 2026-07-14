@@ -6,8 +6,9 @@ never runs Foundry.
 Balancer's `LogExpMath` is the secondary comparator (ADR 0002): the grader
 grades Balancer's real outputs against the mpmath truth within Balancer's
 *own* documented accuracy (1e-14 relative on its 1e18 grid, plus 2 wei of
-rounding). That path is green from day one and proves the grader machinery
-while the kernel path is still red.
+rounding). Passing here validates the grader machinery on an independent,
+production implementation of this math — a grader bug would fail Balancer,
+not just the kernel.
 
 ## Pinned source
 
