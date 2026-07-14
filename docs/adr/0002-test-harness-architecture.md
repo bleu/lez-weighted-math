@@ -1,15 +1,17 @@
 # ADR 0002: Test harness architecture
 
-Status: **ACCEPTED** (Phase 1 grill). Resolves ADR 0001 decisions 1, 5, 6 and
-the scale *method* part of decision 2. Implementation plan:
+Status: **ACCEPTED** (initial design review). Settles the target error bound,
+the wrapper set, the Balancer comparator, and the scale-sweep *method* — four
+of the open questions from the design brief (indexed at the time in
+`docs/archive/0001-open-decisions.md`). Implementation plan:
 `docs/archive/plans/0001-test-harness.md`.
 
 ## Context
 
 The kernel is fund-loss-sensitive. Its correctness claim is "correct to a proven
 error bound versus mpmath," not "bit-identical to Balancer." The harness is the
-mechanism that makes that claim checkable, so it is built before the kernel —
-the kernel bodies stay `todo!()` while the grader is developed.
+mechanism that makes that claim checkable, so it was built before the kernel,
+while the kernel bodies were still `todo!()`.
 
 Building the judge first carries one hazard: a test failing against a blank
 kernel looks the same as a test failing because the grader is broken. Both show
@@ -19,7 +21,7 @@ neutralising that hazard.
 
 ## Decision
 
-### The error bound is parametric (ADR 0001 #1)
+### The error bound is parametric
 
 No hand-picked pass/fail constant. The bound is
 `BOUND = quant_floor(SCALE) + BUDGET`:
@@ -30,11 +32,12 @@ No hand-picked pass/fail constant. The bound is
 - `BUDGET` is the algorithmic allowance the kernel is permitted on top of the
   representation floor.
 
-The kernel tests are red because the kernel panics, never because the number is
-wrong. When the post-kernel scale sweep runs, `SCALE` and `BUDGET` are the only
-things that move; the harness structure is unaffected.
+During the build this meant a kernel test could only be red because the kernel
+panicked, never because a bound constant was wrong. When the scale sweep runs,
+`SCALE` and `BUDGET` are the only things that move; the harness structure is
+unaffected.
 
-### Two hard gates plus a diagnostic (ADR 0001 #1)
+### Two hard gates plus a diagnostic
 
 - **Economic gate:** the final payout `tokens_out`, in token wei. This is the
   fund-loss surface and the natural integer unit.
@@ -45,7 +48,7 @@ things that move; the harness structure is unaffected.
   subtraction), localises catastrophic cancellation near the sale start. It
   informs failures; it is not the headline gate.
 
-### Signed, one-sided error band (ADR 0001 #5)
+### Signed, one-sided error band
 
 Rounding must always favour the pool, so accuracy is not a symmetric tolerance.
 The error must live in `[0, BOUND]`:
@@ -58,7 +61,7 @@ The error must live in `[0, BOUND]`:
 The two are distinct failure categories, reported differently. `calc_out_given_in`
 rounds down (floored payout).
 
-### Full wrapper set, each direction-checked (ADR 0001 #5)
+### Full wrapper set, each direction-checked
 
 `pow_up`/`pow_down`, `mul_up`/`mul_down`, `div_up`/`div_down`, and `complement`.
 Invariant per wrapper: `_up ≥ true` (within `BOUND` above), `_down ≤ true`
@@ -66,7 +69,7 @@ Invariant per wrapper: `_up ≥ true` (within `BOUND` above), `_down ≤ true`
 failure localisation; proves the fixed-point bricks before `pow` is trusted),
 and composed through `calc_out_given_in` (the end-to-end economic gate).
 
-### Fixtures are scale-independent (ADR 0001 #2, method)
+### Fixtures are scale-independent
 
 The oracle stores truth as a high-precision decimal string (human) and a `q128`
 integer, `floor(value · 2^128)` (machine). Rust rescales `q128` to its
@@ -76,13 +79,13 @@ regenerates a fixture. Balances/amounts are raw `u128` wei strings (ADR 0003);
 `tokens_out_floor` is the correctly rounded-down payout, so the gate is a pure
 integer comparison.
 
-### Balancer validates the grader (ADR 0001 #6)
+### Balancer validates the grader
 
 Balancer's `LogExpMath` is a real, working implementation of this math, so the
-grader can judge *it* today. The differential runner grades Balancer's captured
-outputs against the mpmath truth within Balancer's *own* known accuracy — this
-path is green from day one and proves the grader machinery is sound while the
-kernel path stays red. Grading Balancer against the kernel's (possibly stricter)
+grader can judge *it* independently. The differential runner grades Balancer's
+captured outputs against the mpmath truth within Balancer's *own* known
+accuracy — this path passed before the kernel existed, proving the grader
+machinery sound. Grading Balancer against the kernel's (possibly stricter)
 bound would produce a confusing false-red, so the self-check uses a bound
 appropriate to what it grades.
 
@@ -92,7 +95,7 @@ no Foundry, no Python. The Balancer source is GPL-3.0 and is **not** vendored
 into this MIT/Apache repo; only the captured numbers (data) and our script live
 here, with a documented regeneration command.
 
-### proptest owns oracle-free invariants (ADR 0001, testing strategy)
+### proptest owns oracle-free invariants
 
 CI has no Python, so for a randomly generated input there is no answer key and
 property tests cannot check accuracy. They check what holds by logic across the
@@ -100,7 +103,7 @@ whole domain: never panics / never overflows (an empirical companion to the
 written overflow proof), output bounds (`pow ∈ (0,1]`, `tokens_out ≤
 balance_out`), monotonicity, and rounding self-consistency (`_up ≥ _down`).
 Exact accuracy stays with the fixture tests. Generators carry the danger-zone
-weighting (ADR 0001 #9 domain).
+weighting (sale-start and high-exponent regions oversampled).
 
 ### Scope boundaries
 
@@ -112,12 +115,12 @@ weighting (ADR 0001 #9 domain).
 
 ## Consequences
 
-- The committed harness has a green path (grader vs. Balancer, generator
-  sanity) and a red path (grader vs. blank kernel). The green path is the proof
-  the grader works; the red path is the TDD target.
+- The harness was committed with a passing path (grader vs. Balancer,
+  generator sanity) that proved the grader worked, and a failing path (grader
+  vs. blank kernel) that the kernel implementation then turned green.
 - The scale sweep becomes a knob-turn, not a rebuild.
 - CI stays dependency-free (no Python, no Foundry) — fixtures are the only input.
 - A wrong-side rounding bug fails loudly and distinctly from a precision
   shortfall, matching the fund-safety priority.
-- The kernel API must take raw `u128` balances (ADR 0003), so the `weighted.rs`
-  scaffold signatures change as part of implementation.
+- The kernel API must take raw `u128` balances (ADR 0003), so the initial
+  `weighted.rs` signatures changed as part of implementation.

@@ -1,6 +1,7 @@
 # ADR 0005: Series choice — atanh for ln, alternating Taylor for exp, Horner throughout
 
-Status: **ACCEPTED** (kernel implementation). Resolves ADR 0001 decision 3.
+Status: **ACCEPTED** (kernel implementation). Settles the series-choice
+question from the design brief.
 
 ## Context
 

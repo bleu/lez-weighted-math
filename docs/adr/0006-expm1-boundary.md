@@ -1,6 +1,7 @@
 # ADR 0006: There is no expm1 boundary — the guard bits carry 1-power everywhere
 
-Status: **ACCEPTED** (kernel implementation). Resolves ADR 0001 decision 4.
+Status: **ACCEPTED** (kernel implementation). Settles the expm1-boundary
+question from the design brief.
 
 ## Context
 

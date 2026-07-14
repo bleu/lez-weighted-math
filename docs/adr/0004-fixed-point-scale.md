@@ -1,6 +1,7 @@
 # ADR 0004: Fixed-point scale is 2^52
 
-Status: **ACCEPTED** (post-kernel sweep). Resolves ADR 0001 decision 2.
+Status: **ACCEPTED** (post-kernel sweep). Settles the fixed-point scale
+question from the design brief.
 
 ## Context
 

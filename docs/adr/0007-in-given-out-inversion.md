@@ -5,8 +5,8 @@ scope without reopening the base ∈ (0,1) design decision.
 
 ## Context
 
-The scaffold's `calc_in_given_out` and `spot_price` were dropped during the
-kernel build because the textbook form of the first needs
+The initial API sketch's `calc_in_given_out` and `spot_price` were dropped
+during the kernel build because the textbook form of the first needs
 `pow(base > 1)` — the regime whose deletion is what makes this kernel small
 (no large-argument `exp`, output pinned to (0,1]). Restoring them raised the
 question of whether that decision had to be reopened.
