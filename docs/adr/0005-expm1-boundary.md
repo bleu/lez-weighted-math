@@ -1,4 +1,4 @@
-# ADR 0006: There is no expm1 boundary — the guard bits carry 1-power everywhere
+# ADR 0005: There is no expm1 boundary — the guard bits carry 1-power everywhere
 
 Status: **ACCEPTED** (kernel implementation). Settles the expm1-boundary
 question from the design brief.
@@ -38,4 +38,4 @@ diagnostic by the harness; the swap path does not call it.
 - One code path for all regions: no boundary constant, no branch to get
   wrong on either side, one fewer thing for the audit.
 - The `2^-53` pad on `1 - power` is what caps the honest public scale at
-  52 (see ADR 0004).
+  52 (see ADR 0003).

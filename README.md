@@ -21,7 +21,7 @@ assert!(out > 0 && out < 500_000_000);
 ```
 
 Balances, amounts, and weights are raw `u128` (the LEZ native token unit);
-fixed point appears only internally, at 52 fractional bits (ADR 0004). Every
+fixed point appears only internally, at 52 fractional bits (ADR 0003). Every
 rounding favours the pool, and one `pow` costs exactly one hardware division
 — division being the most expensive RISC0 primitive. `CONTEXT.md` has the
 design overview; `docs/adr/` records each decision and its alternatives.
@@ -33,7 +33,7 @@ Balancer. `pow_up`/`pow_down` stay within 4 ulps of the true value at
 `2^-52` (measured worst case: 2, the deliberate directional pad), on the
 pool-safe side only — a result on the fund-losing side of true fails the
 suite regardless of magnitude. The sweep table behind the numbers is in
-ADR 0004; the written error analysis is `docs/error-analysis.md`.
+ADR 0003; the written error analysis is `docs/error-analysis.md`.
 
 ## How correctness is established
 
@@ -42,7 +42,7 @@ Each layer is independent of the ones above it:
 - **Differential gates** — every `pow` and swap output graded against
   committed mpmath fixtures, with signed one-sided error bands
   (`crates/harness/tests/differential.rs`, fixtures from
-  `crates/harness/oracle/`; architecture in ADR 0002).
+  `crates/harness/oracle/`; architecture in ADR 0001).
 - **Grader self-validation** — the same grader judges Balancer's captured
   `LogExpMath` outputs within Balancer's own documented accuracy, proving
   the machinery on an independent implementation
@@ -55,7 +55,7 @@ Each layer is independent of the ones above it:
   silently (`crates/harness/tests/overflow_envelope.rs`).
 - **Curve invariant** — `b_in^w_in · b_out^w_out` never decreases across a
   trade, checked against an exact big-integer referee by both proptest and
-  a coverage-guided fuzzer (ADR 0008).
+  a coverage-guided fuzzer (ADR 0007).
 - **zkVM parity** — the kernel compiled as a RISC0 guest is bit-identical
   to the host across the whole fixture set, with measured cycle costs
   (`zkvm/`, `docs/zkvm-cycles.md`).
@@ -69,7 +69,7 @@ Each layer is independent of the ones above it:
 - `zkvm` — separate workspace: RISC0 guest build, host-vs-guest parity,
   cycle measurement.
 - `fuzz` — separate workspace: the coverage-guided curve-invariant fuzz
-  target (local-only, see ADR 0008).
+  target (local-only, see ADR 0007).
 
 ## Build & test
 

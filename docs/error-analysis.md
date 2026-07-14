@@ -3,7 +3,7 @@
 The kernel computes `pow(base, y) = exp(y · ln base)` at `LN_SCALE = 62`
 fractional bits and rounds once at the end. This is the ulp accounting
 behind the `POW_PAD_ULPS = 2` directional pad in `pow.rs`; the harness
-sweep (ADR 0004) confirms it case by case.
+sweep (ADR 0003) confirms it case by case.
 
 All bounds below are at `LN_SCALE`, where `ulp = 2^-62`.
 

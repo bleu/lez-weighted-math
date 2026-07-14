@@ -2,12 +2,12 @@
 //!
 //! Balances, amounts, and weights are raw `u128` — the LEZ native token
 //! unit. `Fixed` is used only for the base ratio and the weight-ratio
-//! exponent (ADR 0003).
+//! exponent (ADR 0002).
 //!
 //! Every rounding favours the pool: base up, exponent down, `1 - power`
 //! padded down, final payout multiply floored — the payout never exceeds
 //! the true value. `calc_in_given_out` is inverted into the same
-//! `base ∈ (0,1)` domain (ADR 0007); `spot_price` needs no `pow` at all.
+//! `base ∈ (0,1)` domain (ADR 0006); `spot_price` needs no `pow` at all.
 //!
 //! Envelope (asserted; violations panic, never wrap): reserves >= 1 wei,
 //! total deposit < 2^128, weights in `[1, 2^64]` with ratio in
@@ -85,7 +85,7 @@ pub fn calc_out_given_in(
 /// Rounded up: the pool never undercharges. The base-above-one form is
 /// inverted into the kernel's `(0,1)` domain via
 /// `(b/(b-a))^y - 1 = (1-p)/p`, flipping every rounding direction once
-/// (ADR 0007).
+/// (ADR 0006).
 ///
 /// ```
 /// use weighted_math_core::weighted::calc_in_given_out;
@@ -104,7 +104,7 @@ pub fn calc_out_given_in(
 /// # Panics
 ///
 /// As [`calc_out_given_in`], plus: `amount_out` above 30% of the reserve,
-/// or a payment past `u128` (ADR 0007).
+/// or a payment past `u128` (ADR 0006).
 pub fn calc_in_given_out(
     balance_in: u128,
     weight_in: u128,

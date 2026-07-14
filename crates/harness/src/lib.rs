@@ -1,5 +1,5 @@
 //! Test harness for `weighted-math-core`: fixture structs, the quantizer,
-//! and the signed one-sided band checker. See ADR 0002.
+//! and the signed one-sided band checker. See ADR 0001.
 //!
 //! The grader is parametric over `(SCALE, BUDGET)`. `SCALE` comes from the
 //! kernel crate (the sweepable knob); [`BUDGET_ULPS`] is the algorithmic
@@ -257,13 +257,13 @@ pub fn check_two_sided(t_floor: i128, t_ceil: i128, actual: i128, bound_ulps: u1
 }
 
 // ---------------------------------------------------------------------------
-// Curve-invariant referee (ADR 0008)
+// Curve-invariant referee (ADR 0007)
 // ---------------------------------------------------------------------------
 
 /// Does the trade keep the curve value `b_in^w_in * b_out^w_out` from
 /// decreasing? Exact big-integer comparison with no rounding of its own
 /// and no code shared with the kernel: a `false` is a real fund leak
-/// (ADR 0008). Weights must be integers in 1..=99 so they can be
+/// (ADR 0007). Weights must be integers in 1..=99 so they can be
 /// exponents here.
 pub fn invariant_preserved(
     balance_in: u128,

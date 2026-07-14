@@ -3,7 +3,7 @@
 Offline only. CI reads the committed `../fixtures/balancer_pow.json` and
 never runs Foundry.
 
-Balancer's `LogExpMath` is the secondary comparator (ADR 0002): the grader
+Balancer's `LogExpMath` is the secondary comparator (ADR 0001): the grader
 grades Balancer's real outputs against the mpmath truth within Balancer's
 *own* documented accuracy (1e-14 relative on its 1e18 grid, plus 2 wei of
 rounding). Passing here validates the grader machinery on an independent,
@@ -18,7 +18,7 @@ not just the kernel.
 
 The source is fetched at capture time into `src-external/` (gitignored),
 not vendored. Note: the v3 file is MIT-licensed — the GPL-3.0 concern in
-ADR 0002 applies to Balancer v2 — but keeping the source external keeps the
+ADR 0001 applies to Balancer v2 — but keeping the source external keeps the
 provenance unambiguous either way. Only the captured numbers (data) and our
 script live in this repo.
 

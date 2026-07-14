@@ -1,4 +1,4 @@
-# ADR 0003: Balances are raw u128 at the API boundary
+# ADR 0002: Balances are raw u128 at the API boundary
 
 Status: **ACCEPTED** (initial design review). Surfaced while designing the
 harness fixture schema.
@@ -13,7 +13,7 @@ be `Fixed` values at the working scale; that signature was unsound.
 
 The platform context reinforces the point: LEZ token amounts are native `u128`
 with no decimals field (`CONTEXT.md`), and the LEE reference AMM does its swap
-math in `u128` (the integer-width survey in ADR 0009).
+math in `u128` (the integer-width survey in ADR 0008).
 
 ## Decision
 

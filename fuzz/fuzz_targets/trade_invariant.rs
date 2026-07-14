@@ -1,5 +1,5 @@
 //! Coverage-guided companion to the proptest invariant properties
-//! (ADR 0008): on any trade inside the enforced envelope, the curve value
+//! (ADR 0007): on any trade inside the enforced envelope, the curve value
 //! `b_in^w_in * b_out^w_out` must not decrease, and the kernel must not
 //! panic. The referee is the harness's exact bigint comparison.
 //!

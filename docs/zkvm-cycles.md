@@ -86,7 +86,7 @@ Static division counts, from the code (all confirmed by the measured deltas):
 The largest *block* is different from the largest instruction: the 20-term
 exp Horner loop costs ~4.1k cycles (about half of `pow`), at roughly 210
 cycles per 128-bit multiply-shift-add step. If the cycle budget ever needs
-trimming, exp term count is the first knob; ADR 0005 chose 20 terms for
+trimming, exp term count is the first knob; ADR 0004 chose 20 terms for
 error-bound headroom, not cost.
 
 For contrast, a Balancer-style `LogExpMath.pow` runs a couple dozen
@@ -94,7 +94,7 @@ divisions per call (range-reduction ladders plus per-term series divisions).
 At ~2.5k cycles each that is ~60k cycles of division alone, roughly 5x our
 entire buy path. Keeping the kernel at one division per pow is where the
 cycle budget was won; this replaces the pre-implementation estimate from the
-integer-width decision (ADR 0009, "single-digit thousands of cycles per pow")
+integer-width decision (ADR 0008, "single-digit thousands of cycles per pow")
 with measured numbers of the same order.
 
 ## Caveats

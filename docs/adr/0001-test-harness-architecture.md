@@ -1,4 +1,4 @@
-# ADR 0002: Test harness architecture
+# ADR 0001: Test harness architecture
 
 Status: **ACCEPTED** (initial design review). Settles the target error bound,
 the wrapper set, the Balancer comparator, and the scale-sweep *method* — four
@@ -75,7 +75,7 @@ The oracle stores truth as a high-precision decimal string (human) and a `q128`
 integer, `floor(value · 2^128)` (machine). Rust rescales `q128` to its
 compiled-in `SCALE` at test time. Pow output is in (0,1], so `q128 < 2^128` fits
 a `u128` — the Rust side stays native, no bignum. Re-sweeping the scale never
-regenerates a fixture. Balances/amounts are raw `u128` wei strings (ADR 0003);
+regenerates a fixture. Balances/amounts are raw `u128` wei strings (ADR 0002);
 `tokens_out_floor` is the correctly rounded-down payout, so the gate is a pure
 integer comparison.
 
@@ -122,5 +122,5 @@ weighting (sale-start and high-exponent regions oversampled).
 - CI stays dependency-free (no Python, no Foundry) — fixtures are the only input.
 - A wrong-side rounding bug fails loudly and distinctly from a precision
   shortfall, matching the fund-safety priority.
-- The kernel API must take raw `u128` balances (ADR 0003), so the initial
+- The kernel API must take raw `u128` balances (ADR 0002), so the initial
   `weighted.rs` signatures changed as part of implementation.

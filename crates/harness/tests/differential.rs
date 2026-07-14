@@ -1,4 +1,4 @@
-//! Differential tests against the mpmath oracle fixtures (ADR 0002):
+//! Differential tests against the mpmath oracle fixtures (ADR 0001):
 //! kernel gates with signed one-sided error bands, plus grader
 //! self-validation (Balancer's captured outputs, fixture sanity) proving
 //! the machinery independently of the kernel.

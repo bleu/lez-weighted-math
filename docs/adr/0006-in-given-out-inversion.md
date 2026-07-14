@@ -1,4 +1,4 @@
-# ADR 0007: calc_in_given_out by base inversion; 30% out-ratio cap; spot_price without pow
+# ADR 0006: calc_in_given_out by base inversion; 30% out-ratio cap; spot_price without pow
 
 Status: **ACCEPTED**. Extends the kernel API beyond the M1 `calc_out_given_in`
 scope without reopening the base ∈ (0,1) design decision.

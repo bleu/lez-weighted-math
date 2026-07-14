@@ -1,4 +1,4 @@
-# ADR 0005: Series choice — atanh for ln, alternating Taylor for exp, Horner throughout
+# ADR 0004: Series choice — atanh for ln, alternating Taylor for exp, Horner throughout
 
 Status: **ACCEPTED** (kernel implementation). Settles the series-choice
 question from the design brief.
@@ -37,7 +37,7 @@ the constants unverifiable by inspection (each Taylor constant is
 
 - Measured against the oracle at `SCALE = 52`: raw pow error stays inside
   the one-ulp quantization interval on every fixture case, including the
-  sale-start and exponent-99 danger zones (see ADR 0004's sweep table).
+  sale-start and exponent-99 danger zones (see ADR 0003's sweep table).
 - `calc_out_given_in` costs three divisions total: base ratio, exponent
   ratio, and `t` — versus ~25+ in the Balancer-shaped alternative.
 - The constants block in `pow.rs` states each derivation formula inline;

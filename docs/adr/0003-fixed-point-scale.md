@@ -1,4 +1,4 @@
-# ADR 0004: Fixed-point scale is 2^52
+# ADR 0003: Fixed-point scale is 2^52
 
 Status: **ACCEPTED** (post-kernel sweep). Settles the fixed-point scale
 question from the design brief.
@@ -6,7 +6,7 @@ question from the design brief.
 ## Context
 
 The brief's starting point was "~2^52, sweep against mpmath to confirm;
-don't hand-pick." The harness was built parametric over `SCALE` (ADR 0002)
+don't hand-pick." The harness was built parametric over `SCALE` (ADR 0001)
 so the sweep is a one-line edit plus a recompile. With the kernel
 implemented, the sweep ran over the candidates the oracle emitted floors
 for: 44, 48, 52, 56, 60.
@@ -51,7 +51,7 @@ error is exactly the deliberate ±2-ulp pad of `pow_up`/`pow_down`.
 - The one-ulp quantization floor is `2^-52 ≈ 2.2e-16`, about 45x finer
   than Balancer's 1e-18-grid pow with its 1e-14 relative error bound.
 - Re-running the sweep after any kernel change is
-  `sed` + `cargo test`; fixtures never regenerate (ADR 0002 held).
+  `sed` + `cargo test`; fixtures never regenerate (ADR 0001 held).
 - A future move to `SCALE = 56` would require widening the internal
   pipeline (LN_SCALE > 62 needs i256 series arithmetic) — a cost/precision
   trade the current LBP use case does not justify.

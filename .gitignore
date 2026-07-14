@@ -15,6 +15,9 @@
 # Criterion benchmark output
 /target/criterion/
 
+# Process residue kept locally, not published
+/docs/archive/
+
 # Editor / OS
 .DS_Store
 *.swp

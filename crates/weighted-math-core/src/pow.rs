@@ -169,7 +169,7 @@ pub fn exp(x: Fixed) -> Fixed {
 /// `exp(x) - 1` for `x <= 0`, accurate near zero; result in `[-1, 0]`.
 ///
 /// Computed as the exact 62-bit complement `1 - exp_inner(-x)`, so there
-/// is no cancellation (ADR 0006).
+/// is no cancellation (ADR 0005).
 ///
 /// # Panics
 ///
@@ -203,7 +203,7 @@ fn pow_62(base: Fixed, exponent: Fixed) -> i128 {
 /// `1 - base^exponent` at `LN_SCALE`, padded down (pool-favouring), for
 /// the payout path. The subtraction is exact and the guard bits carry
 /// values as small as `2^-46` into the final widened multiply — this is
-/// what keeps sale-start payouts accurate (ADR 0006).
+/// what keeps sale-start payouts accurate (ADR 0005).
 pub(crate) fn one_minus_pow_62(base: Fixed, exponent: Fixed) -> i128 {
     (ONE_62 - pow_62(base, exponent) - PAD_62).max(0)
 }

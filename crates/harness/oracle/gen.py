@@ -17,7 +17,7 @@ Design notes (see docs/adr/0002-test-harness-architecture.md):
 * Truth values are stored as ~78-digit decimal strings (human) plus a
   q-format integer (machine): `floor(value * 2^128)` for values in [0,1),
   `floor(value * 2^116)` for -ln (which can reach ~28 on our input grid).
-* out_given_in balances/amounts/weights are raw u128 integers (ADR 0003).
+* out_given_in balances/amounts/weights are raw u128 integers (ADR 0002).
   Truth is computed at the exact rational inputs: exact Fraction arithmetic
   when the exponent is an integer, mpmath at 220 digits otherwise.
   `tokens_out_floor` is the true payout rounded down (pool-favouring), so
@@ -40,7 +40,7 @@ DIGITS = 78     # human-facing decimal digits for truth values
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 
-# Candidate fixed-point scales for the sweep (ADR 0002; result in ADR 0004).
+# Candidate fixed-point scales for the sweep (ADR 0001; result in ADR 0003).
 SCALES = [40, 44, 48, 52, 56, 60]
 
 

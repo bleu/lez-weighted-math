@@ -1,8 +1,8 @@
-# ADR 0009: i128/u128 arithmetic with one localized widening, not i256
+# ADR 0008: i128/u128 arithmetic with one localized widening, not i256
 
 Status: **ACCEPTED**. Decided before the kernel was written (recorded at the
 time in `docs/archive/handoffs/2026-07-09-i128-vs-i256-decision.md`); since
-confirmed by the accuracy sweep (ADR 0004) and the measured cycle table
+confirmed by the accuracy sweep (ADR 0003) and the measured cycle table
 (`docs/zkvm-cycles.md`).
 
 ## Context
@@ -20,7 +20,7 @@ type anywhere else, and no bignum dependency in the kernel.
 
 The fallback, had the accuracy sweep failed: widen selectively at the step
 that needs it, never the whole kernel. The sweep passed at `SCALE = 52`
-(ADR 0004), so the fallback was never used.
+(ADR 0003), so the fallback was never used.
 
 ## Rationale
 
@@ -58,10 +58,10 @@ integer type to the audit.
 ## Consequences
 
 - `Fixed` is `i128` at `SCALE = 52`; the internal pipeline runs at 62
-  fractional bits, comfortably inside `i128` (ADR 0004 records the two
+  fractional bits, comfortably inside `i128` (ADR 0003 records the two
   ceilings that cap the public scale).
 - The one widening lives in `wide.rs` behind a fit assertion; a result past
   `u128` halts rather than wraps (see the overflow-envelope tests).
 - A future precision demand beyond `SCALE = 56` would force 256-bit series
-  arithmetic (ADR 0004) — that is the point at which this decision would be
+  arithmetic (ADR 0003) — that is the point at which this decision would be
   revisited.

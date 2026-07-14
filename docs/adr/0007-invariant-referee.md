@@ -1,7 +1,7 @@
-# ADR 0008: Curve-invariant property with an exact big-integer referee
+# ADR 0007: Curve-invariant property with an exact big-integer referee
 
 Status: **ACCEPTED**. Adds the end-to-end fund-safety property on top of the
-per-step directional gates from ADR 0002.
+per-step directional gates from ADR 0001.
 
 ## Context
 
@@ -42,7 +42,7 @@ Supporting choices:
   on equality; strict would be a false claim about the math.
 - **Both trade functions are covered.** `calc_out_given_in` over the
   `any_swap` domain and `calc_in_given_out` over the `exact_out_swap`
-  domain — the latter guards the ADR 0007 inversion, where every rounding
+  domain — the latter guards the ADR 0006 inversion, where every rounding
   direction flips once.
 - **Two vehicles share one referee** (`harness::invariant_preserved`):
   proptest properties in the normal suite, plus a coverage-guided
