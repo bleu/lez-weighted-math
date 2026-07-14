@@ -9,7 +9,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = ""
 
 # Keep release math deterministic and reproducible. No overflow wraparound in

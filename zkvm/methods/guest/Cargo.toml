@@ -2,7 +2,7 @@
 name = "weighted-math-guest"
 version = "0.0.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 description = "Minimal RISC0 guest wrapping weighted-math-core for parity and cycle measurement."
 publish = false
 

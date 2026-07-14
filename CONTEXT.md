@@ -3,7 +3,7 @@
 **Project:** a fixed-point weighted-pool `pow` kernel for a Balancer-style
 LBP on the Logos Execution Zone (LEZ). It does triple duty: open-source
 track-record artifact for RFP-016, the M1 on-chain guest logic, and an audit
-surface. Licensed MIT + Apache-2.0.
+surface. Licensed MIT.
 
 ## Platform constraints (verified against `lez-programs` main)
 

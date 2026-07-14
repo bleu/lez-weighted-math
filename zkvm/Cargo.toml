@@ -10,7 +10,7 @@ members = ["host", "methods"]
 
 [workspace.package]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [profile.release]
 # Match the root workspace: financial math panics on overflow, never wraps.

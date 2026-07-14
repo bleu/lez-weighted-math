@@ -92,7 +92,7 @@ appropriate to what it grades.
 Source: canonical Solidity `LogExpMath` at a pinned commit, captured offline via
 a committed `forge` script into `balancer_pow.json`. CI reads only the fixture —
 no Foundry, no Python. The Balancer source is GPL-3.0 and is **not** vendored
-into this MIT/Apache repo; only the captured numbers (data) and our script live
+into this MIT repo; only the captured numbers (data) and our script live
 here, with a documented regeneration command.
 
 ### proptest owns oracle-free invariants
