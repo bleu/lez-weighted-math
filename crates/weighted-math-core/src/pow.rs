@@ -123,6 +123,10 @@ pub(crate) fn ln_inner(x: i128) -> i128 {
         m <<= 1;
         k += 1;
     }
+    // Proof invariants: at most SCALE doublings from m0 >= 2^(62-SCALE),
+    // and m normalizes into [sqrt(2)/2, sqrt(2)) at 2^62.
+    debug_assert!(k <= SCALE as i128);
+    debug_assert!((SQRT2_HALF_62..2 * SQRT2_HALF_62).contains(&m));
     let t = ((m - ONE_62) << LN_SCALE) / (m + ONE_62);
     let u = (t * t) >> LN_SCALE;
     let mut p = ATANH_COEFF_62[ATANH_COEFF_62.len() - 1];
@@ -141,7 +145,10 @@ pub(crate) fn ln_inner(x: i128) -> i128 {
 /// alternating Taylor series (Horner, constants only). `k > 62` underflows
 /// the 62-bit grid and returns 0 — this also keeps the final shift in range.
 pub(crate) fn exp_inner(neg_arg: i128) -> i128 {
-    debug_assert!(neg_arg >= 0);
+    // Proven caller envelope (docs/overflow-proof.md): the pow paths pass
+    // < 2^75, exp/expm1 saturate at 2^68 — so the `k` estimate product
+    // below stays under 2^107 and cannot wrap u128.
+    debug_assert!((0..1i128 << 76).contains(&neg_arg));
     let mut k = ((neg_arg as u128 * INV_LN2_30) >> (30 + LN_SCALE)) as i128;
     let mut s = neg_arg - k * LN2_62;
     while s < 0 {
@@ -173,15 +180,21 @@ pub fn ln(x: Fixed) -> Fixed {
     Fixed(-to_scale_nearest(ln_inner(x.0)))
 }
 
+/// Saturation cutoff for the public `exp`/`expm1`: at `x <= -64` the true
+/// `exp(x) < 2^-92`, far below any sweepable grid, so the result is the
+/// saturated value outright. Compared before negation (`i128::MIN` never
+/// reaches a `-x`), and it caps `exp_inner`'s argument at `64·2^62 = 2^68`,
+/// inside its proven envelope (docs/overflow-proof.md).
+const EXP_SATURATION: i128 = 64 << SCALE;
+
 /// Natural exponential of `x <= 0`; result in `[0, 1]`, nearest-rounded
 /// (zero means the true value underflows the `2^-SCALE` grid).
 pub fn exp(x: Fixed) -> Fixed {
     assert!(x.0 <= 0, "exp domain: x <= 0");
-    match (-x.0).checked_shl(LN_SCALE - SCALE) {
-        Some(neg_arg) => Fixed(to_scale_nearest(exp_inner(neg_arg))),
-        // |x| >= 2^117: deeper underflow than any representable result.
-        None => Fixed(0),
+    if x.0 <= -EXP_SATURATION {
+        return Fixed(0);
     }
+    Fixed(to_scale_nearest(exp_inner((-x.0) << (LN_SCALE - SCALE))))
 }
 
 /// `exp(x) - 1` for `x <= 0`, accurate near zero; result in `[-1, 0]`.
@@ -191,10 +204,10 @@ pub fn exp(x: Fixed) -> Fixed {
 /// carry the small result until the single final rounding.
 pub fn expm1(x: Fixed) -> Fixed {
     assert!(x.0 <= 0, "expm1 domain: x <= 0");
-    let omp62 = match (-x.0).checked_shl(LN_SCALE - SCALE) {
-        Some(neg_arg) => ONE_62 - exp_inner(neg_arg),
-        None => ONE_62,
-    };
+    if x.0 <= -EXP_SATURATION {
+        return Fixed(-ONE.0);
+    }
+    let omp62 = ONE_62 - exp_inner((-x.0) << (LN_SCALE - SCALE));
     Fixed(-to_scale_nearest(omp62))
 }
 
@@ -242,8 +255,9 @@ fn pow_raw(base: Fixed, exponent: Fixed) -> i128 {
         "pow domain: exponent in (0, 99]"
     );
     let neg_ln = ln_inner(base.0);
-    // exponent · (-ln base): 99·2^SCALE times ~89·2^62 needs the widened
-    // multiply; after >> SCALE the argument is < 2^76, comfortably i128.
+    // exponent · (-ln base): up to 99·2^SCALE times < 42·2^62 can pass
+    // 2^128 at swept scales, hence the widened multiply; after >> SCALE
+    // the argument is < 2^75, comfortably i128.
     let neg_arg = wide::mul_shr(exponent.0 as u128, neg_ln as u128, SCALE) as i128;
     to_scale_nearest(exp_inner(neg_arg))
 }
