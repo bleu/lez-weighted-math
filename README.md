@@ -1,7 +1,8 @@
 # lez-weighted-math
 
 A fixed-point weighted-pool math kernel targeting the LEZ RISC0 zkVM: a
-small, deterministic, `no_std` Rust implementation of Balancer-style
+small, deterministic, `no_std` Rust implementation of
+[Balancer-style](https://docs.balancer.fi/concepts/explore-available-balancer-pools/weighted-pool/weighted-math.html)
 weighted-pool swap math — `calc_out_given_in` / `calc_in_given_out` and the
 underlying fixed-point `pow(base, exponent)` — validated for accuracy
 against a high-precision `mpmath` oracle.
