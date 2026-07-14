@@ -1,0 +1,21 @@
+[package]
+name = "weighted-math-guest"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Minimal RISC0 guest wrapping weighted-math-core for parity and cycle measurement."
+publish = false
+
+# Its own workspace: risc0-build compiles this crate with the rzup-managed
+# risc0 toolchain, independent of both the zkvm host workspace and the root.
+[workspace]
+
+[dependencies]
+risc0-zkvm = { version = "3.0.5", default-features = false, features = ["std"] }
+weighted-math-core = { path = "../../../crates/weighted-math-core" }
+
+[profile.release]
+# Same semantics as the root workspace: panic on overflow, never wrap.
+# The cycle numbers below therefore INCLUDE the overflow-check cost — this
+# is the binary the on-chain program would actually ship.
+overflow-checks = true

@@ -1,0 +1,18 @@
+# Separate workspace: the RISC0 guest build and its host runner. Kept out of
+# the root workspace so the kernel + harness stay on the pinned rustc 1.73
+# with pinned deps, and default CI never compiles any risc0 crate.
+#
+# Build/run (needs `rzup install`, see zkvm/README.md):
+#   cd zkvm && cargo run --release
+[workspace]
+resolver = "2"
+members = ["host", "methods"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[profile.release]
+# Match the root workspace: financial math panics on overflow, never wraps.
+# The guest is its own workspace (methods/guest) with the same setting.
+overflow-checks = true

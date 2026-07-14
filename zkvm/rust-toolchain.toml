@@ -1,0 +1,5 @@
+# Host-side toolchain for the zkvm workspace only. risc0-zkvm 3.x needs a
+# recent rustc; the root workspace stays on its pinned 1.73. The guest itself
+# is compiled by the rzup-managed risc0 toolchain regardless of this file.
+[toolchain]
+channel = "stable"

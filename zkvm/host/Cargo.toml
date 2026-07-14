@@ -1,0 +1,15 @@
+[package]
+name = "zkvm-host"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+description = "Runs the weighted-math guest in the RISC0 executor: host-vs-guest bit parity over the fixture set, plus cycle measurement."
+publish = false
+
+[dependencies]
+zkvm-methods = { path = "../methods" }
+weighted-math-core = { path = "../../crates/weighted-math-core" }
+risc0-zkvm = { version = "3.0.5", default-features = false, features = ["client"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

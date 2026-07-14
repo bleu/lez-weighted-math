@@ -1,5 +1,6 @@
 # Rust / Cargo
 /target/
+/zkvm/target/
 /fuzz/target/
 /fuzz/corpus/
 /fuzz/artifacts/
