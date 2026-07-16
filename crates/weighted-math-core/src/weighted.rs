@@ -125,7 +125,7 @@ pub fn calc_in_given_out(
     }
 
     // Exponent rounds up, base' rounds down: both understate p.
-    let exponent = Fixed((((weight_out << SCALE) + weight_in - 1) / weight_in) as i128);
+    let exponent = Fixed(((weight_out << SCALE).div_ceil(weight_in)) as i128);
     let base = ratio_down(balance_out - amount_out, balance_out);
     let p62 = pow::pow_62_down(base, exponent);
     // With the 30% cap, p >= 0.7^99 ~ 2^-50.6, four times the pad floor.
@@ -134,7 +134,7 @@ pub fn calc_in_given_out(
 
     // (1 - p)/p at LN_SCALE, rounded up: numerator <= 2^124 fits u128.
     let num = ((ONE_62 - p62) as u128) << pow::LN_SCALE;
-    let r62 = (num + p62 as u128 - 1) / p62 as u128;
+    let r62 = num.div_ceil(p62 as u128);
     debug_assert!(r62 <= 1 << 124);
 
     // ceil(balance_in · r62 / 2^62); the fit assert is the payment envelope.
@@ -168,8 +168,8 @@ fn ratio_up(num: u128, den: u128) -> Fixed {
     } else {
         (num, den)
     };
-    // n <= 2^(126-SCALE), so n << SCALE <= 2^126 and `+ d - 1` fits.
-    let q = ((n << SCALE) + d - 1) / d;
+    // n <= 2^(126-SCALE), so n << SCALE <= 2^126 and stays in u128.
+    let q = (n << SCALE).div_ceil(d);
     debug_assert!(q >> 127 == 0, "ratio fits the signed representation");
     Fixed(q as i128)
 }

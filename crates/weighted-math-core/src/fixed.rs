@@ -56,8 +56,7 @@ impl Fixed {
     pub fn div_up(self, rhs: Fixed) -> Fixed {
         let d = nonneg(rhs);
         let n = numerator(self, rhs);
-        // n < 2^127 and d < 2^127 (both come from Repr), so no overflow.
-        Fixed(checked_repr((n + d - 1) / d))
+        Fixed(checked_repr(n.div_ceil(d)))
     }
 
     /// `ONE - self`, saturating at zero. Exact integer subtraction.

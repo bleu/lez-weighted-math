@@ -72,9 +72,7 @@ fn exact_out_swap() -> impl Strategy<Value = (u128, u128, u128, (u128, u128))> {
         let cap30 = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
         // ~b_out·w_in/(4·w_out), saturating: when the weight ratio makes it
         // exceed the reserve, the 30% cap governs anyway.
-        let cap_fit = (balance_out / (4 * w_out))
-            .checked_mul(w_in)
-            .unwrap_or(u128::MAX);
+        let cap_fit = (balance_out / (4 * w_out)).saturating_mul(w_in);
         let max_out = cap30.min(cap_fit).max(1);
         (
             Just(balance_in),
@@ -139,7 +137,7 @@ proptest! {
         let cap30 = balance_out / 10 * 3 + balance_out % 10 * 3 / 10;
         prop_assert!(amount_out <= cap30.max(1));
         // exponent * drain <= ~1/4 keeps the payment below ~b_in/2
-        let cap_fit = (balance_out / (4 * w_out)).checked_mul(w_in).unwrap_or(u128::MAX);
+        let cap_fit = (balance_out / (4 * w_out)).saturating_mul(w_in);
         prop_assert!(amount_out <= cap_fit || amount_out == 1);
     }
 }
